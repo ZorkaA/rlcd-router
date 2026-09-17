@@ -1,19 +1,45 @@
-## 2026-09-17T07:47:58Z
+# DISPATCH: Milestone 1 Challenger 1 (Dual-Queue Priority Preemption & Cancellation Stress)
 
-# Challenger 1 Dispatch: Milestone 1 Stress Testing
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1
 
-You are teamwork_preview_challenger_m1_1.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Task Objective
+Adversarially challenge Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Empirically verify:
+1. Priority Preemption:
+   - Construct a test or run validation proving `fallbackQueue` (`.high`) preempts active `speculativeQueue` (`.low`) transfers.
+2. Signal Dropping & Cancellation:
+   - Prove that `tryCancel()` on a speculative command buffer reliably drops the `MTLSharedEvent` signal (signaled value does NOT advance), and the GPU compute queue does not unblock on a phantom event.
+3. Queue Saturation & Throttling:
+   - Saturate `speculativeQueue` with 16 command buffers and verify it handles bounds and backpressure gracefully without crashing the process or kernel.
 
-MANDATORY INPUTS:
-- /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Code under challenge: `src/data/model_loader.py`, `src/data/stream_extractor.py`, `src/data/dataset.py`, `src/config.py`
+### Authoritative References:
+- Requirements: `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section)
+- Architecture & Contracts: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`
+- Worker Handoff: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md`
 
-YOUR ROLE & OBJECTIVE:
-Adversarial stress-testing and empirical validation:
-1. Stress test zero-OOM streaming extractor over repeated loops (simulate 50-100 sequences), tracking memory via psutil RSS and active torch.Tensor count. Assert zero unbounded memory accumulation.
-2. Stress test trailing token masking: craft extreme sequence lengths (L=4, L=3, L=2, L=1), verifying that valid_mask does not throw IndexError and correctly masks out-of-boundary lookaheads.
-3. Stress test device switching and dtype casting: test CPU and MPS with valid and invalid dtypes.
-4. Record all test executions, metrics, and verdict (APPROVE or REJECT) in handoff.md.
+### Deliverables:
+- Maintain `progress.md`.
+- Write your empirical verification report to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1/handoff.md`.
+- Explicitly conclude with verdict: **APPROVE** or **REQUEST_CHANGES**.
+
+
+## 2026-09-17T16:49:30Z
+You are Challenger 1 for Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+Read Phase 2 architecture at: /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md
+Read Worker handoff at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md
+
+Task:
+Adversarially challenge Milestone 1:
+1. Empirically verify that fallbackQueue (.high) preempts active speculativeQueue (.low) loads.
+2. Empirically verify that tryCancel() on speculative commands drops the MTLSharedEvent signal without unblocking GPU compute prematurely.
+3. Verify queue behavior under 16-command saturation.
+4. Conclude with explicit verdict: APPROVE or REQUEST_CHANGES.
+
+Deliverables:
+- Maintain progress.md.
+- Write report to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_1/handoff.md.
+- Send message to orchestrator with your verdict.

@@ -1,40 +1,51 @@
-# Reviewer 1 Dispatch: Milestone 1 Verification
+# DISPATCH: Milestone 1 Reviewer 1 (Fast I/O & Queue Conformance Review)
 
-You are teamwork_preview_reviewer_m1_1.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1
 
-MANDATORY INPUTS:
-- /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- /Users/jack/Downloads/rlcd-router/PROJECT.md
-- /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_1/handoff.md
-- Code under review:
-  - src/config.py
-  - src/data/model_loader.py
-  - src/data/stream_extractor.py
-  - src/data/dataset.py
+## Task Objective
+Conduct an independent code and architecture review of Milestone 1 (Fast I/O Engine & Dual-Queue Subsystem).
 
-YOUR ROLE & OBJECTIVE:
-Examine Milestone 1 implementation for correctness, completeness, robustness, and conformance to the M1 <-> M2 interface contract:
-1. Run builds / tests: `pytest -v tests/` and `pytest -v tests/test_tier1_features.py -k "f01 or f02 or f03 or f04 or f05"`.
-2. Inspect device resolution: does it properly handle Apple Silicon MPS vs CPU? Does it guard against BFloat16 crash on MPS?
-3. Inspect zero-OOM streaming extractor: does it enforce `torch.inference_mode()`, `use_cache=False`, immediate CPU detach, and memory cleanup?
-4. Inspect dataset partitioning and alignment: is 80/20 sequence isolation strictly enforced? Are trailing tokens correctly masked for horizons T+1..T+3?
-5. Verdict: Report APPROVE or REQUEST_CHANGES in your handoff.md.
+### Mandatory Verification:
+1. Inspect `Sources/AsyncMoERouter/FastIO/FastIOEngine.swift`:
+   - Verify `speculativeQueue`: `MTLIOPriority.low`, `maxCommandBufferCount = 16`, `type = .concurrent`.
+   - Verify `fallbackQueue`: `MTLIOPriority.high`, `maxCommandBufferCount = 16`, `type = .concurrent`.
+2. Inspect `Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift`:
+   - Verify `MTLIOFileHandle` usage, direct DMA loading (`loadBuffer`), 16KB Apple Silicon page alignment, and defensive client-side bounds checking.
+3. Inspect `Sources/AsyncMoERouter/FastIO/SyncEvent.swift`:
+   - Verify `MTLSharedEvent` zero-CPU hardware synchronization between `MTLIOCommandBuffer` and GPU compute command buffer.
+4. Run `swift build` and `swift test --filter FastIOTests` in `/Users/jack/Downloads/rlcd-router`.
+5. Run full test suite `swift test` to ensure zero regressions.
 
-## 2026-09-17T07:47:58Z
-You are teamwork_preview_reviewer_m1_1.
-Your working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1
-Your parent is orchestrator (conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719).
+### Authoritative References:
+- Requirements: `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section)
+- Architecture & Contracts: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`
+- Worker Handoff: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md`
 
-MANDATORY INPUTS:
-- Read /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- Read /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_1/handoff.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1/DISPATCH.md
+### Deliverables:
+- Maintain `progress.md`.
+- Write your review report to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1/handoff.md`.
+- Explicitly conclude with verdict: **APPROVE** or **REQUEST_CHANGES**.
+- Send a message to orchestrator with your verdict.
 
-YOUR OBJECTIVE:
-Objectively review Milestone 1 (`src/config.py`, `src/data/model_loader.py`, `src/data/stream_extractor.py`, `src/data/dataset.py`).
-Run tests: `pytest -v tests/` and verify pass rates.
-Inspect device handling (MPS float16 requirement), zero-OOM memory hygiene, dataset splitting, and interface contracts.
-Document your findings and record your verdict (APPROVE or REQUEST_CHANGES) in handoff.md. Send a completion message to parent.
+## 2026-09-17T16:49:29Z
+You are Reviewer 1 for Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+Read Phase 2 architecture at: /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md
+Read Worker handoff at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md
+
+Task:
+Conduct an independent code and architecture review of Milestone 1:
+1. Verify FastIOEngine.swift: speculativeQueue (PriorityLow, maxCommandBufferCount 16, concurrent) and fallbackQueue (PriorityHigh, max 16, concurrent).
+2. Verify WeightFileHandle.swift: MTLIOFileHandle DMA loads, 16KB page alignment, defensive bounds checking.
+3. Verify SyncEvent.swift: MTLSharedEvent zero-CPU hardware synchronization.
+4. Run `swift build` and `swift test --filter FastIOTests` in /Users/jack/Downloads/rlcd-router.
+5. Conclude with explicit verdict: APPROVE or REQUEST_CHANGES.
+
+Deliverables:
+- Maintain progress.md.
+- Write report to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_1/handoff.md.
+- Send message to orchestrator with your verdict.
+

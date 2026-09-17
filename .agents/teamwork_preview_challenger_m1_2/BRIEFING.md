@@ -1,53 +1,47 @@
-# BRIEFING — 2026-09-17T07:52:30Z
+# BRIEFING — 2026-09-17T16:50:45Z
 
 ## Mission
-Empirically stress-test Milestone 1 boundary conditions: sequence-atomic partitioning, safetensors serialization (strides/batching), and boundary token gradient isolation.
+Adversarially challenge Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem focusing on memory leak stress (200+ loads, 0-byte RAM growth), defensive bounds protection, and multi-slot out-of-order SyncEvent safety.
 
 ## 🔒 My Identity
 - Archetype: empirical challenger
 - Roles: critic, specialist
 - Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_challenger_m1_2
-- Original parent: ce5bc762-f633-465c-9133-7ec43d0b5719
-- Milestone: Milestone 1
+- Original parent: 913b8328-6b64-4881-a075-c0057bc23d84
+- Milestone: Phase 2 Milestone 1
 - Instance: 2 of 2
 
 ## 🔒 Key Constraints
 - Review-only — do NOT modify implementation code
 - Report any failures as findings — do NOT fix them yourself
 - .agents/ must contain only metadata — never source, tests, or data
-- Empirical verification required: write and execute tests yourself, do not trust claims or logs
+- Empirical verification required: write and execute tests yourself, do not trust worker claims or logs
 - Communicate results via send_message and handoff.md
 
 ## Current Parent
-- Conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719
-- Updated: 2026-09-17T07:48:00Z
+- Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
+- Updated: 2026-09-17T16:50:45Z
 
 ## Review Scope
-- **Files to review**: `src/data/model_loader.py`, `src/data/stream_extractor.py`, `src/data/dataset.py`, `src/config.py`
-- **Interface contracts**: /Users/jack/Downloads/rlcd-router/PROJECT.md, /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- **Review criteria**: sequence-atomic partitioning, safetensors serialization robustness, gradient isolation on masked tokens
+- **Files to review**: `Sources/AsyncMoERouter/FastIO/FastIOEngine.swift`, `Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift`, `Sources/AsyncMoERouter/FastIO/SyncEvent.swift`, `Sources/AsyncMoERouter/Common/Config.swift`, `Sources/AsyncMoERouter/Common/MetalContext.swift`, `Sources/AsyncMoERouter/Common/Types.swift`
+- **Interface contracts**: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`, `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md`
+- **Review criteria**: 200+ repeated loads memory leak stress (0 bytes RAM growth), defensive bounds traps, multi-slot out-of-order safety
 
 ## Key Decisions Made
-- Created comprehensive adversarial stress test suite in `tests/test_m1_challenger2_stress.py` containing 132 tests.
-- Empirically verified sequence-atomic partitioning disjointness across 90 split ratio / sequence size combinations.
-- Empirically verified safetensors contiguity enforcement on transposed, strided, permuted, and expanded (stride 0) tensors.
-- Empirically verified PyTorch DataLoader scaling from batch size 1 to 4096 and multiprocessing with num_workers=2.
-- Empirically proved mathematical gradient isolation on masked boundary tokens (exact 0.0 gradient norm across deep layers).
-- Verdict: APPROVE.
+- Designing `FastIOChallenger2StressTests.swift` in `swift_tests/AsyncMoERouterTests/Unit/` to empirically test all 3 requirements without altering production code.
 
 ## Artifact Index
-- handoff.md — Final handoff report
-- tests/test_m1_challenger2_stress.py — 132-test adversarial boundary & data integrity harness
+- handoff.md — Final empirical handoff report
+- progress.md — Liveness heartbeat and milestone tracking
+- swift_tests/AsyncMoERouterTests/Unit/FastIOChallenger2StressTests.swift — Empirical challenge test suite
 
 ## Attack Surface
 - **Hypotheses tested**:
-  1. Sequence-atomic split ratio boundary failures (tested N=2..1000, ratios 0.01..0.99) -> Confirmed strictly disjoint.
-  2. Token-level context contamination between train and calib -> Confirmed 0 token overlap.
-  3. Safetensors crash on strange strides (transposed, slice step > 1, stride 0) -> Confirmed contiguous enforcement.
-  4. DataLoader crash on large batch sizes exceeding dataset or memory-mapped slicing -> Confirmed clean batching.
-  5. Gradient leakage from masked boundary tokens into deep backbone -> Confirmed exact 0.0 gradient norm.
-- **Vulnerabilities found**: None. System is resilient to strange strides, arbitrary valid split ratios, and gradient leakage.
-- **Untested angles**: Hardware-specific TPU execution (out of project scope; MPS and CPU are authoritative).
+  1. Repeated Fast I/O loads leak system RAM or retain command buffer queue slots over 200+ iterations.
+  2. Out-of-bounds reads (reading past EOF, buffer overflow, invalid layer/expert index) could bypass `WeightFileHandle` checks and corrupt memory.
+  3. Multi-slot concurrent out-of-order ticket completions cause premature signaling or race conditions across slots.
+- **Vulnerabilities found**: TBD during test execution.
+- **Untested angles**: Hardware NVMe queue depth saturation beyond 16 commands simultaneously.
 
 ## Loaded Skills
 - None

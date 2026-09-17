@@ -1,40 +1,51 @@
-# Reviewer 2 Dispatch: Milestone 1 Verification
+# DISPATCH: Milestone 1 Reviewer 2 (Memory Safety, Concurrency & Test Robustness)
 
-You are teamwork_preview_reviewer_m1_2.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2
 
-MANDATORY INPUTS:
-- /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- /Users/jack/Downloads/rlcd-router/PROJECT.md
-- /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_1/handoff.md
-- Code under review:
-  - src/config.py
-  - src/data/model_loader.py
-  - src/data/stream_extractor.py
-  - src/data/dataset.py
+## Task Objective
+Conduct an independent review of Milestone 1 focusing on memory lifecycle, Swift 6 concurrency safety, error handling, and test robustness.
 
-YOUR ROLE & OBJECTIVE:
-Independent objective review and adversarial check of Milestone 1:
-1. Run builds / tests: `pytest -v tests/` and verify all tests compile and execute cleanly.
-2. Inspect Safetensors serialization: are tensors contiguous before saving? Is the loader functional and compliant with PyTorch DataLoader?
-3. Inspect synthetic model fixture and tokenizer: do they allow 100% offline, zero-download test execution without requiring 28GB model download?
-4. Inspect code style, error handling, edge cases, and interface contracts.
-5. Verdict: Report APPROVE or REQUEST_CHANGES in your handoff.md.
+### Mandatory Verification:
+1. Memory Lifecycle & Leaks:
+   - Check `Package.swift`, `Sources/AsyncMoERouter/Common/`, and `FastIO/`.
+   - Verify buffer lifecycle: buffers allocated in `.storageModeShared`, no memory leaks under repeated allocations.
+   - Verify `autoreleasepool` usage in repeated loops prevents `MTLIOCommandQueue` command buffer exhaustion.
+2. Swift Concurrency Safety:
+   - Verify thread safety across concurrent DMA loads and compute submissions.
+   - Verify proper use of locks (`OSAllocatedUnfairLock`) and `Sendable` conformance.
+3. Test Robustness:
+   - Inspect `swift_tests/AsyncMoERouterTests/Unit/FastIOTests.swift`.
+   - Verify tests actually execute on GPU and test all edge cases.
+4. Run `swift build` and `swift test` in `/Users/jack/Downloads/rlcd-router`.
 
-## 2026-09-17T07:47:58Z
-You are teamwork_preview_reviewer_m1_2.
-Your working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2
-Your parent is orchestrator (conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719).
+### Authoritative References:
+- Requirements: `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section)
+- Architecture & Contracts: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`
+- Worker Handoff: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md`
 
-MANDATORY INPUTS:
-- Read /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- Read /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_1/handoff.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2/DISPATCH.md
+### Deliverables:
+- Maintain `progress.md`.
+- Write your review report to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2/handoff.md`.
+- Explicitly conclude with verdict: **APPROVE** or **REQUEST_CHANGES**.
+- Send a message to orchestrator with your verdict.
 
-YOUR OBJECTIVE:
-Independent objective review and adversarial check of Milestone 1.
-Run tests: `pytest -v tests/`.
-Inspect Safetensors contiguity and roundtrip integrity, synthetic model fixture parity, DataLoader integration, and edge cases.
-Document your findings and record your verdict (APPROVE or REQUEST_CHANGES) in handoff.md. Send a completion message to parent.
+## 2026-09-17T16:49:29Z
+You are Reviewer 2 for Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+Read Phase 2 architecture at: /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md
+Read Worker handoff at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md
+
+Task:
+Conduct an independent review of Milestone 1 focusing on memory safety, concurrency, and test robustness:
+1. Verify memory lifecycle: MTLBuffer in Shared mode, zero leaks under repeated allocations, autoreleasepool in repeated loops.
+2. Verify Swift 6 strict concurrency, Sendable conformance, and OSAllocatedUnfairLock thread safety.
+3. Verify FastIOTests test coverage and run `swift test` in /Users/jack/Downloads/rlcd-router.
+4. Conclude with explicit verdict: APPROVE or REQUEST_CHANGES.
+
+Deliverables:
+- Maintain progress.md.
+- Write report to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_reviewer_m1_2/handoff.md.
+- Send message to orchestrator with your verdict.

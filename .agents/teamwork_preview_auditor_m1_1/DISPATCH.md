@@ -1,46 +1,52 @@
-# Forensic Auditor Dispatch: Milestone 1 Integrity Verification
+# DISPATCH: Milestone 1 Forensic Auditor (Integrity Forensics)
 
-You are teamwork_preview_auditor_m1_1.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1
 
-MANDATORY INPUTS:
-- /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Implementation files: `src/config.py`, `src/data/model_loader.py`, `src/data/stream_extractor.py`, `src/data/dataset.py`
-- Test files: `tests/test_tier1_features.py`, `tests/conftest.py`
+## Task Objective
+Perform a forensic integrity audit on Milestone 1 (Fast I/O Engine & Dual-Queue Subsystem) implementation in `Sources/AsyncMoERouter/` and tests in `swift_tests/AsyncMoERouterTests/`.
 
-YOUR ROLE & OBJECTIVE:
-Forensic integrity audit for Milestone 1. You must perform systematic checks to verify that functionality is implemented genuinely and authentically:
-1. Static code analysis:
-   - Check for hardcoded test outputs or returns tailored specifically to test cases.
-   - Check for dummy/facade implementations that simulate shapes or values without genuine logic.
-   - Check for mock objects in production code path.
-2. Runtime execution verification:
-   - Verify that tensors produced by `StreamExtractor` are genuinely computed by model forward passes and not static constants.
-   - Verify that sequence-atomic partitioning genuinely isolates sequences without shortcuts.
-   - Verify that safetensors serialization and deserialization bit-for-bit preserves tensor values.
-3. Verdict:
-   - If clean: Report CLEAN in handoff.md.
-   - If cheating or integrity violation detected: Report INTEGRITY VIOLATION with full evidence chain in handoff.md.
+### Mandatory Forensic Integrity Checks:
+1. Hardcoded Values & Facade Detection:
+   - Check if `FastIOEngine`, `WeightFileHandle`, or `SyncEvent` contain any hardcoded test outputs, return dummy/mock data, or bypass actual Metal 3 Fast I/O calls.
+   - Verify `device.makeIOCommandQueue` is actually called with descriptors setting `priority = .low`, `maxCommandBufferCount = 16`, and `priority = .high`.
+   - Verify `device.makeIOFileHandle` is actually opening files on disk and not reading pre-computed arrays.
+2. Test Legitimacy:
+   - Verify `swift_tests/AsyncMoERouterTests/Unit/FastIOTests.swift` actually executes on the GPU and tests genuine I/O pipelines.
+   - Verify assertions check real data, real event signaling, and real cancellations.
+3. Code Integrity:
+   - Static analysis: check for `// cheating`, bypasses, disabled tests, or fabricated verification outputs.
 
-## 2026-09-17T07:47:59Z
-You are teamwork_preview_auditor_m1_1.
-Your working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1
-Your parent is orchestrator (conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719).
+### Authoritative References:
+- Requirements: `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section)
+- Architecture & Contracts: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`
+- Worker Handoff: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md`
 
-MANDATORY INPUTS:
-- Read /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- Read /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1/DISPATCH.md
-- Implementation files: src/config.py, src/data/model_loader.py, src/data/stream_extractor.py, src/data/dataset.py
-- Test files: tests/test_tier1_features.py, tests/conftest.py
+### Deliverables:
+- Maintain `progress.md`.
+- Write your forensic audit report to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1/handoff.md`.
+- Explicitly conclude with binary verdict: **CLEAN** or **INTEGRITY VIOLATION**.
+- Send a message to orchestrator with your verdict.
 
-YOUR OBJECTIVE:
-Perform a comprehensive forensic integrity audit of Milestone 1.
-Verify that:
-1. No hardcoded outputs or test-matching shortcuts exist in src/.
-2. No dummy or facade implementations exist.
-3. StreamExtractor and MoECalibrationDataset genuinely execute real tensor transformations, forward passes, and safetensors I/O.
-Record your verdict (CLEAN or INTEGRITY VIOLATION) with full evidence in handoff.md. Send a completion message to parent.
+## 2026-09-17T16:49:30Z
+You are the Forensic Auditor for Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+Read Phase 2 architecture at: /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md
+Read Worker handoff at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_worker_m1_2/handoff.md
+
+Task:
+Perform a forensic integrity audit on Milestone 1:
+1. Static analysis & facade detection: check if FastIOEngine, WeightFileHandle, or SyncEvent hardcode results or return dummy mock data.
+2. Verify that makeIOCommandQueue genuinely creates low/high priority queues with maxCommandBufferCount 16.
+3. Verify that MTLIOFileHandle genuinely performs disk DMA reads.
+4. Verify that FastIOTests tests genuine Metal execution.
+5. Conclude with binary verdict: CLEAN or INTEGRITY VIOLATION.
+
+Deliverables:
+- Maintain progress.md.
+- Write report to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_auditor_m1_1/handoff.md.
+- Send message to orchestrator with your verdict.
+
 

@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-17T16:20:20Z
+# BRIEFING — 2026-09-17T16:49:30Z
 
 ## Mission
 Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router adhering strictly to R1-R5 requirements and conservative memory constraints.
@@ -32,8 +32,8 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
   5. M4: ICB Native Conditional Execution & Cascading Abort [pending]
   6. M5: MLX Cache Limiting & Background Recalibration [pending]
   7. M6: Full Pipeline Integration & E2E Acceptance [pending]
-- **Current phase**: 1 (Milestone 1 Implementation)
-- **Current focus**: Milestone 1 Replacement Worker verifying build & test suite.
+- **Current phase**: 1 (Milestone 1 Gate Verification)
+- **Current focus**: Milestone 1 Verification (Reviewers, Challengers, Forensic Auditor).
 
 ## 🔒 Key Constraints
 - Pure orchestrator: DISPATCH-ONLY. NEVER write, modify, or create source code directly. NEVER run build/test commands. NEVER investigate code directly. Only write metadata (.md) in own .agents/ folder.
@@ -51,7 +51,8 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 - Completed Survey Phase (survey_1, survey_2, survey_3).
 - Authored Phase 2 `PROJECT.md` with 15 features across 6 milestones (M1–M6).
 - Completed M1 exploration (explorer_m1_1, spec_miner_m1_2, explorer_m1_3).
-- worker_m1_1 authored 9 Swift files before encountering quota exhaustion; killed and replaced with worker_m1_2.
+- Completed M1 implementation via worker_m1_2 (all 21 unit tests passed, commit 9361c6b).
+- Dispatched M1 Gate verification team (2 Reviewers, 2 Challengers, 1 Forensic Auditor).
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
@@ -62,13 +63,17 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 | explorer_m1_1 | teamwork_preview_explorer | M1 SwiftPM & Code Architecture | done | 7dd9b6ca-dba7-464f-a975-3e1c6897052a |
 | spec_miner_m1_2 | teamwork_preview_spec_miner | M1 Fast I/O & MTLIOFileHandle Specs | done | 9900edd7-d345-4425-bc23-503cee2f67c4 |
 | explorer_m1_3 | teamwork_preview_explorer | M1 Sync & Unit Test Design | done | 56e95edc-708e-4b5e-a80d-7be284f6ee6c |
-| worker_m1_1 | teamwork_preview_worker | M1 Implementation & Verification | failed | a3decb61-c30a-47c1-b948-cbfcf0fc90ad |
-| worker_m1_2 | teamwork_preview_worker | M1 Replacement Verification & Test | in-progress | 1a5fcb28-ba72-46dc-b140-220179b358c3 |
+| worker_m1_2 | teamwork_preview_worker | M1 Implementation & Verification | done | 1a5fcb28-ba72-46dc-b140-220179b358c3 |
+| reviewer_m1_1 | teamwork_preview_reviewer | M1 Fast I/O & Queue Conformance | in-progress | 83782dd3-9f7d-4dea-afa5-b1f206ceab65 |
+| reviewer_m1_2 | teamwork_preview_reviewer | M1 Memory & Concurrency Review | in-progress | 9f6cffc6-ca05-4a27-bdae-78c133442f4e |
+| challenger_m1_1 | teamwork_preview_challenger | M1 Preemption & Cancel Stress | in-progress | 4d90f21d-36a6-4a4a-b9c1-b4d394a8ba5a |
+| challenger_m1_2 | teamwork_preview_challenger | M1 Memory Leak & Bounds Stress | in-progress | e5ecebb1-6b0d-45b8-90f5-9a688daa690c |
+| auditor_m1_1 | teamwork_preview_auditor | M1 Forensic Integrity Audit | in-progress | b2873ba5-45f4-48f2-8a40-b7032f24ce8e |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 8 / 16
-- Pending subagents: 1a5fcb28-ba72-46dc-b140-220179b358c3
+- Spawn count: 13 / 16
+- Pending subagents: 83782dd3-9f7d-4dea-afa5-b1f206ceab65, 9f6cffc6-ca05-4a27-bdae-78c133442f4e, 4d90f21d-36a6-4a4a-b9c1-b4d394a8ba5a, e5ecebb1-6b0d-45b8-90f5-9a688daa690c, b2873ba5-45f4-48f2-8a40-b7032f24ce8e
 - Predecessor: none
 - Successor: not yet spawned
 
