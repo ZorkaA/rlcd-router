@@ -35,8 +35,8 @@ Milestone 1 satisfies all requirements of R1 (Fast I/O dual queues, MTLIOFileHan
 | worker_m2_2 | teamwork_preview_worker | DONE (Build & 13 tests pass, commit 6f0f198) | handoff.md |
 | reviewer_m2_1 | teamwork_preview_reviewer | APPROVE (Conformance, state machine, R2 specs) | handoff.md |
 | reviewer_m2_2 | teamwork_preview_reviewer | APPROVE (Concurrency, memory budget, 0 leaks) | handoff.md |
-| challenger_m2_1 | teamwork_preview_challenger | PENDING | in-progress |
+| challenger_m2_1 | teamwork_preview_challenger | APPROVE (250-cycle hit/miss stress & signal dropping) | handoff.md |
 | challenger_m2_2 | teamwork_preview_challenger | PENDING | in-progress |
-| auditor_m2_1 | teamwork_preview_auditor | PENDING | in-progress |
+| auditor_m2_1 | teamwork_preview_auditor | CLEAN (Zero facades, authentic Metal 3 API & 500MB ceiling) | handoff.md |
 
 Gate Result: **IN_EVALUATION**

@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-18T01:30:00Z
+# BRIEFING — 2026-09-18T01:40:00Z
 
 ## Mission
 Conduct an independent forensic integrity audit on Phase 2 Milestone 2: Ring Buffer Pool & Fallback Pool (Requirement R2).
@@ -19,7 +19,7 @@ Conduct an independent forensic integrity audit on Phase 2 Milestone 2: Ring Buf
 
 ## Current Parent
 - Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
-- Updated: not yet
+- Updated: 2026-09-18T01:40:00Z
 
 ## Audit Scope
 - **Work product**:
@@ -31,18 +31,22 @@ Conduct an independent forensic integrity audit on Phase 2 Milestone 2: Ring Buf
 - **Audit type**: forensic integrity check
 
 ## Audit Progress
-- **Phase**: investigating
-- **Checks completed**: initial context loading
-- **Checks remaining**:
-  - Source code analysis (hardcoding, facade, pre-populated artifacts)
-  - Metal 3 API and zero-CPU sync verification
-  - 500MB hard ceiling and isolation verification
-  - Empirical execution of swift build and swift test
-  - Stress testing and adversarial review
-- **Findings so far**: Under investigation
+- **Phase**: reporting
+- **Checks completed**:
+  - Source code analysis (zero hardcoding, zero facade, zero pre-populated artifacts)
+  - Metal 3 API calls and zero-CPU synchronization via MTLSharedEvent
+  - 500MB hard ceiling enforcement ($524,288,000$ bytes) and speculative isolation
+  - Deadlock resolution protocol, tryCancel(), and signal dropping
+  - Empirical execution of `swift build` and `swift test --filter BufferPoolTests` (13/13 passed)
+  - Regression verification `swift test --filter FastIOTests` (21/21 passed)
+  - Challenger stress suites verification (`FallbackPoolChallenger2StressTests` 7/7 passed, `BufferPoolDeadlockAdversarialTests` 5/5 passed)
+- **Checks remaining**: None
+- **Findings so far**: CLEAN — All 8 forensic integrity checks passed with zero integrity violations.
 
 ## Key Decisions Made
-- Audit independently without relying on worker handoff claims
+- Confirmed zero hardcoded test returns or dummy assertions across all test suites.
+- Verified empirical Metal 3 DMA buffer allocation in macOS unified memory.
+- Validated strict 500MB capacity ceiling enforcement under 32-thread concurrent contention.
 
 ## Artifact Index
 - DISPATCH.md — Assignment instructions
@@ -51,9 +55,13 @@ Conduct an independent forensic integrity audit on Phase 2 Milestone 2: Ring Buf
 - handoff.md — Final forensic audit verdict and evidence
 
 ## Attack Surface
-- **Hypotheses tested**: none yet
-- **Vulnerabilities found**: none yet
-- **Untested angles**: allocation limits, race conditions, memory leaks, mock bypasses
+- **Hypotheses tested**:
+  - Hypothesis: 500MB ceiling could be breached under concurrent demand bursts -> REFUTED (128 concurrent attempts capped strictly at 520,093,696 bytes <= 524,288,000 bytes)
+  - Hypothesis: Speculative prefetch could be smuggled into Fallback Pool -> REFUTED (100/100 rejected with FallbackPoolError.speculativeRequestRejected)
+  - Hypothesis: Abandoned speculative callback could advance MTLSharedEvent -> REFUTED (Signal strictly dropped, slot reclaimed to .free)
+  - Hypothesis: 500-2000 continuous churn cycles could leak memory -> REFUTED (mach_task_basic_info resident delta < 0.4 MB, 0 leaked slots)
+- **Vulnerabilities found**: None in core implementation.
+- **Untested angles**: Hardware failure during physical NVMe DMA (handled via FastIOError).
 
 ## Loaded Skills
 - None specified by orchestrator
