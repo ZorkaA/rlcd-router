@@ -1,0 +1,676 @@
+--- swift_tests/AsyncMoERouterTests/Unit/ExecutionLogTests.swift	2026-09-18 01:45:57
++++ .agents/teamwork_preview_explorer_m3_3/proposed_ExecutionLogTests.swift	2026-09-18 01:45:47
+@@ -1,9 +1,115 @@
++//===----------------------------------------------------------------------===//
++//
++// This source file is part of the AsyncMoERouter open source project
++//
++// Copyright (c) 2026 Apple Inc. and the AsyncMoERouter project authors
++// Licensed under Apache License v2.0
++//
++//===----------------------------------------------------------------------===//
++
+ import Testing
+ import Metal
+ import Foundation
+ @testable import AsyncMoERouter
+ 
+-/// ExecutionLog unit tests (M3) — drain semantics, ring wrap-around, entry clearing.
++/// Synthetic MSL shader sources for Milestone 3 runtime execution and stress tests.
++public enum SyntheticExecutionLogShaders {
++    /// Realistic synthetic gating and execution logging kernel.
++    /// Computes deterministic expert routing and calibrated confidence without atomics,
++    /// writing a 32-byte ExecutionLogEntry directly to the circular execution log.
++    public static let mockGatingAndLogSource: String = """
++    #include <metal_stdlib>
++    using namespace metal;
++
++    struct ExecutionLogEntry {
++        uint   tokenIndex;
++        ushort layerIndex;
++        ushort horizonIndex;
++        ushort expertID;
++        ushort padding;
++        float  confidenceScore;
++        ulong  timestamp;
++        ulong  reserved;
++    };
++
++    kernel void syntheticGatingAndLog(
++        device ExecutionLogEntry* logBuffer     [[buffer(0)]],
++        constant uint&            logCapacity   [[buffer(1)]],
++        constant uint&            tokenOffset   [[buffer(2)]],
++        constant ushort&          layerIndex    [[buffer(3)]],
++        constant ushort&          horizonIndex  [[buffer(4)]],
++        constant uint&            numExperts    [[buffer(5)]],
++        constant ulong&           baseTimestamp [[buffer(6)]],
++        uint                      tid           [[thread_position_in_grid]]
++    ) {
++        uint globalToken = tokenOffset + tid;
++        // Zero-atomic deterministic slot assignment via token stripe
++        uint slot = globalToken % logCapacity;
++
++        // Deterministic synthetic gating decision
++        ushort expertID = (ushort)((globalToken * 7u + layerIndex * 13u + horizonIndex * 3u) % numExperts);
++        // Calibrated confidence score in [0.50, 0.99]
++        float confidence = 0.50f + 0.49f * fract(sin((float)globalToken * 12.9898f + (float)layerIndex * 78.233f) * 43758.5453f);
++
++        device ExecutionLogEntry& entry = logBuffer[slot];
++        entry.tokenIndex     = globalToken;
++        entry.layerIndex     = layerIndex;
++        entry.horizonIndex   = horizonIndex;
++        entry.expertID       = expertID;
++        entry.padding        = 0;
++        entry.confidenceScore = confidence;
++        entry.timestamp      = baseTimestamp + (ulong)tid * 10ULL;
++        entry.reserved       = 0xCAFEBABEDEADBEEFULL;
++    }
++    """
++
++    /// High-throughput parallel log writer for wraparound and concurrent stress testing.
++    public static let parallelLogWriterSource: String = """
++    #include <metal_stdlib>
++    using namespace metal;
++
++    struct ExecutionLogEntry {
++        uint   tokenIndex;
++        ushort layerIndex;
++        ushort horizonIndex;
++        ushort expertID;
++        ushort padding;
++        float  confidenceScore;
++        ulong  timestamp;
++        ulong  reserved;
++    };
++
++    kernel void parallelLogWriter(
++        device ExecutionLogEntry* logBuffer     [[buffer(0)]],
++        constant uint&            logCapacity   [[buffer(1)]],
++        constant uint&            startToken    [[buffer(2)]],
++        constant ulong&           baseTimestamp [[buffer(3)]],
++        constant uint&            expertBase    [[buffer(4)]],
++        uint                      tid           [[thread_position_in_grid]]
++    ) {
++        uint token = startToken + tid;
++        uint slot = token % logCapacity;
++
++        device ExecutionLogEntry& entry = logBuffer[slot];
++        entry.tokenIndex     = token;
++        entry.layerIndex     = (ushort)(5 + (tid % 20));
++        entry.horizonIndex   = (ushort)(1 + (tid % 3));
++        entry.expertID       = (ushort)((expertBase + tid) % 60);
++        entry.padding        = 0;
++        entry.confidenceScore = 0.88f;
++        entry.timestamp      = baseTimestamp + (ulong)tid;
++        entry.reserved       = 0x55AA55AA00000000ULL | (ulong)tid;
++    }
++    """
++}
++
++/// Comprehensive unit test suite for Milestone 3:
++/// - Exact 32-byte layout and field offset verification for `ExecutionLogEntry`
++/// - 4,096-entry circular wraparound and indexing math
++/// - Post-execution CPU log draining into `LRUWeightTracker`
++/// - Strict verification that pre-routing predictions do NOT modify LRU timestamps (Requirement R3)
++/// - Concurrent GPU write and CPU drain stress testing
++/// - Synthetic runtime MSL gating/logging shaders compiled via `MetalContext.shared`
+ @Suite("Execution Log Tests")
+ struct ExecutionLogTests {
+     let device: any MTLDevice
+@@ -13,8 +119,539 @@
+             throw TestError.metalUnavailable
+         }
+         self.device = dev
++    }
++
++    // MARK: - 1. 32-Byte Layout & Alignment Verification
++
++    @Test("ExecutionLogEntry exact 32-byte size, stride, alignment, and field offsets")
++    func testExecutionLogEntryAlignmentAndLayout() {
++        // Assert struct byte dimensions
++        #expect(MemoryLayout<ExecutionLogEntry>.size == 32, "ExecutionLogEntry size must be exactly 32 bytes")
++        #expect(MemoryLayout<ExecutionLogEntry>.stride == 32, "ExecutionLogEntry stride must be exactly 32 bytes")
++        #expect(MemoryLayout<ExecutionLogEntry>.alignment == 8, "ExecutionLogEntry alignment must be 8 bytes (due to UInt64)")
++
++        // Assert field offsets matching C / MSL struct layout
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.tokenIndex) == 0, "tokenIndex must be at byte offset 0")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.layerIndex) == 4, "layerIndex must be at byte offset 4")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.horizonIndex) == 6, "horizonIndex must be at byte offset 6")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.expertID) == 8, "expertID must be at byte offset 8")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.padding) == 10, "padding must be at byte offset 10")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.confidenceScore) == 12, "confidenceScore must be at byte offset 12")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.timestamp) == 16, "timestamp must be at byte offset 16")
++        #expect(MemoryLayout<ExecutionLogEntry>.offset(of: \.reserved) == 24, "reserved must be at byte offset 24")
++
++        // Bitwise serialization test
++        let rawBuffer = UnsafeMutableRawPointer.allocate(byteCount: 32, alignment: 8)
++        defer { rawBuffer.deallocate() }
++        rawBuffer.initializeMemory(as: UInt8.self, repeating: 0xFF, count: 32)
++
++        let entryPtr = rawBuffer.bindMemory(to: ExecutionLogEntry.self, capacity: 1)
++        entryPtr.pointee = ExecutionLogEntry(
++            tokenIndex: 0x12345678,
++            layerIndex: 0x0506,
++            horizonIndex: 0x0102,
++            expertID: 0x003B, // 59
++            confidenceScore: 0.75,
++            timestamp: 0x0102030405060708,
++            reserved: 0xAABBCCDDEEFF0011
++        )
++
++        // Validate byte serialization
++        let bytePtr = rawBuffer.bindMemory(to: UInt8.self, capacity: 32)
++        // Check tokenIndex (0x12345678 in little-endian: 78 56 34 12)
++        #expect(bytePtr[0] == 0x78)
++        #expect(bytePtr[1] == 0x56)
++        #expect(bytePtr[2] == 0x34)
++        #expect(bytePtr[3] == 0x12)
++        // Check padding is zeroed
++        #expect(bytePtr[10] == 0x00)
++        #expect(bytePtr[11] == 0x00)
++        // Check float 0.75 in IEEE-754 (0x3F400000 in little-endian: 00 00 40 3F)
++        #expect(bytePtr[12] == 0x00)
++        #expect(bytePtr[13] == 0x00)
++        #expect(bytePtr[14] == 0x40)
++        #expect(bytePtr[15] == 0x3F)
++        // Check timestamp (little endian: 08 07 06 05 04 03 02 01)
++        #expect(bytePtr[16] == 0x08)
++        #expect(bytePtr[23] == 0x01)
++    }
++
++    // MARK: - 2. 4,096-Entry Circular Wraparound & Indexing Math
++
++    @Test("Zero-atomic circular log buffer 5,000 entries wraparound and indexing math")
++    func testZeroAtomicCircularLogBufferWrap() throws {
++        let capacity = 4096
++        let totalEntries = 5000
++        let entrySize = MemoryLayout<ExecutionLogEntry>.stride
++        let totalBufferBytes = capacity * entrySize
++
++        // Allocate buffer with 64-byte guard canary memory past capacity
++        let canarySize = 64
++        guard let mtlBuffer = device.makeBuffer(length: totalBufferBytes + canarySize, options: .storageModeShared) else {
++            Issue.record("Failed to allocate test buffer with canary")
++            return
++        }
++        // Fill canary area with 0xAA
++        let canaryPtr = mtlBuffer.contents().advanced(by: totalBufferBytes).bindMemory(to: UInt8.self, capacity: canarySize)
++        for i in 0..<canarySize {
++            canaryPtr[i] = 0xAA
++        }
++
++        let entryPtr = mtlBuffer.contents().bindMemory(to: ExecutionLogEntry.self, capacity: capacity)
++        memset(mtlBuffer.contents(), 0, totalBufferBytes)
++
++        // Write 5,000 entries into 4,096 circular buffer
++        for i in 0..<totalEntries {
++            let slot = i % capacity
++            #expect(slot >= 0 && slot < capacity, "Slot index must be within [0, 4095]")
++            entryPtr[slot] = ExecutionLogEntry(
++                tokenIndex: UInt32(i),
++                layerIndex: UInt16(5 + (i % 20)),
++                horizonIndex: UInt16(1 + (i % 3)),
++                expertID: UInt16(i % 60),
++                confidenceScore: 0.9,
++                timestamp: UInt64(1000 + i)
++            )
++        }
++
++        // Verify clean circular indexing state:
++        // Entries 0..<904 were overwritten by entries 4096..<5000.
++        // Slots 0..<904 must contain tokens 4096..<5000.
++        for slot in 0..<904 {
++            let expectedToken = UInt32(4096 + slot)
++            #expect(entryPtr[slot].tokenIndex == expectedToken, "Slot \(slot) should have wrapped token \(expectedToken)")
++            #expect(entryPtr[slot].timestamp == UInt64(1000 + 4096 + slot))
++        }
++
++        // Slots 904..<4096 must contain first-pass tokens 904..<4096.
++        for slot in 904..<4096 {
++            let expectedToken = UInt32(slot)
++            #expect(entryPtr[slot].tokenIndex == expectedToken, "Slot \(slot) should have retained token \(expectedToken)")
++            #expect(entryPtr[slot].timestamp == UInt64(1000 + slot))
++        }
++
++        // Verify canary guard region was NOT corrupted (zero out-of-bounds writes)
++        for i in 0..<canarySize {
++            #expect(canaryPtr[i] == 0xAA, "Canary corrupted at offset \(i) — out of bounds write detected!")
++        }
++    }
++
++    @Test("GPU runtime kernel circular wraparound via MetalContext")
++    func testGPUExecutionLogKernelWraparound() throws {
++        let ctx = MetalContext.shared
++        let pipeline = try ctx.makeComputePipelineState(
++            source: SyntheticExecutionLogShaders.parallelLogWriterSource,
++            functionName: "parallelLogWriter"
++        )
++
++        let capacity = 4096
++        let log = GPUExecutionLog(device: ctx.device, capacity: capacity)
++
++        func dispatchBatch(startToken: UInt32, count: Int, baseTimestamp: UInt64) {
++            var sToken = startToken
++            var bTime = baseTimestamp
++            var expBase: UInt32 = 0
++            var cap = UInt32(capacity)
++
++            guard let cmdBuf = ctx.commandQueue.makeCommandBuffer(),
++                  let enc = cmdBuf.makeComputeCommandEncoder() else {
++                Issue.record("Failed to create Metal command encoder")
++                return
++            }
++            enc.setComputePipelineState(pipeline)
++            enc.setBuffer(log.buffer, offset: 0, index: 0)
++            enc.setBytes(&cap, length: 4, index: 1)
++            enc.setBytes(&sToken, length: 4, index: 2)
++            enc.setBytes(&bTime, length: 8, index: 3)
++            enc.setBytes(&expBase, length: 4, index: 4)
++
++            let gridSize = MTLSize(width: count, height: 1, depth: 1)
++            let threadgroupSize = MTLSize(width: min(pipeline.maxTotalThreadsPerThreadgroup, count), height: 1, depth: 1)
++            enc.dispatchThreads(gridSize, threadsPerThreadgroup: threadgroupSize)
++            enc.endEncoding()
++            cmdBuf.commit()
++            cmdBuf.waitUntilCompleted()
++        }
++
++        // Pass 1: Write 4,096 tokens (0..<4096)
++        dispatchBatch(startToken: 0, count: 4096, baseTimestamp: 10_000)
++        // Pass 2: Write 904 tokens (4096..<5000), wrapping around into slots 0..<904
++        dispatchBatch(startToken: 4096, count: 904, baseTimestamp: 50_000)
++
++        let ptr = log.buffer.contents().bindMemory(to: ExecutionLogEntry.self, capacity: capacity)
++        #expect(ptr[0].tokenIndex == 4096)
++        #expect(ptr[903].tokenIndex == 4999)
++        #expect(ptr[904].tokenIndex == 904)
++        #expect(ptr[4095].tokenIndex == 4095)
++    }
++
++    // MARK: - 3. Post-Execution CPU Log Draining & LRU Weight Tracker
++
++    @Test("Post-execution CPU log draining integrates with LRUWeightTracker and resets slots")
++    func testCPULogDrainPostExecution() {
++        let capacity = 512
++        let log = GPUExecutionLog(device: device, capacity: capacity)
++        let tracker = LRUWeightTracker()
++
++        let ptr = log.buffer.contents().bindMemory(to: ExecutionLogEntry.self, capacity: capacity)
++
++        // Write batch of 64 entries
++        let batch1Count = 64
++        for i in 0..<batch1Count {
++            ptr[i] = ExecutionLogEntry(
++                tokenIndex: UInt32(i + 1),
++                layerIndex: UInt16(5 + (i % 4)),
++                horizonIndex: UInt16(1 + (i % 3)),
++                expertID: UInt16(i % 16),
++                confidenceScore: 0.85,
++                timestamp: UInt64(10_000 + i * 100)
++            )
++        }
++
++        // Drain batch 1
++        let drained1 = log.drain()
++        #expect(drained1.count == batch1Count)
++        #expect(log.totalEntriesDrained == batch1Count)
++
++        // Verify drained slots are zeroed out (idempotent second drain)
++        let drainedEmpty = log.drain()
++        #expect(drainedEmpty.isEmpty, "Second drain must return empty array")
++
++        // Update LRU tracker with drained entries
++        for entry in drained1 {
++            let key = ExpertKey(layer: Int(entry.layerIndex), expert: Int(entry.expertID))
++            tracker.recordAccess(expert: key, timestamp: entry.timestamp)
++        }
++
++        #expect(tracker.count == 16, "16 unique experts should be resident in tracker")
++        #expect(tracker.totalUpdates == batch1Count)
++
++        // LRU expert must be the one with the lowest timestamp
++        guard let lru = tracker.lruExpert else {
++            Issue.record("Expected resident LRU expert")
++            return
++        }
++        #expect(lru == ExpertKey(layer: 5, expert: 0), "L5E0 was accessed earliest at ts=10000")
++
++        // Write batch 2 (32 entries starting at slot 64)
++        let batch2Count = 32
++        for i in 0..<batch2Count {
++            let slot = 64 + i
++            ptr[slot] = ExecutionLogEntry(
++                tokenIndex: UInt32(100 + i),
++                layerIndex: 5,
++                horizonIndex: 1,
++                expertID: UInt16(i % 4),
++                confidenceScore: 0.92,
++                timestamp: UInt64(50_000 + i * 100)
++            )
++        }
++
++        let drained2 = log.drain()
++        #expect(drained2.count == batch2Count)
++        #expect(log.totalEntriesDrained == batch1Count + batch2Count)
++
++        // Update tracker with batch 2
++        for entry in drained2 {
++            let key = ExpertKey(layer: Int(entry.layerIndex), expert: Int(entry.expertID))
++            tracker.recordAccess(expert: key, timestamp: entry.timestamp)
++        }
++
++        // L5E0 timestamp was updated to 50,000, so it is no longer the LRU victim!
++        let newLRU = tracker.lruExpert
++        #expect(newLRU != ExpertKey(layer: 5, expert: 0), "L5E0 was refreshed and cannot be LRU victim")
+     }
+ 
++    // MARK: - 4. Strict Requirement R3 Post-Execution LRU Invariant Verification
++
++    @Test("Strict Requirement R3: Speculative pre-routing does NOT update LRU timestamps, only log drain does")
++    func testLRUUpdatedStrictlyPostExecution() {
++        let slotCount = 8
++        let slotSizeBytes = 4096
++        let ring = SpeculativeRingBuffer(device: device, slotCount: slotCount, slotSizeBytes: slotSizeBytes)
++        let tracker = LRUWeightTracker()
++        let log = GPUExecutionLog(device: device, capacity: 128)
++
++        // Step 1: Pre-routing speculative prefetch phase
++        // Router speculates 4 candidate experts: L5E0, L5E1, L5E2, L5E3
++        var allocatedSlots: [RingBufferSlot] = []
++        for e in 0..<4 {
++            let expert = ExpertKey(layer: 5, expert: e)
++            guard let slot = ring.allocateSlot(for: expert, ticket: UInt64(e + 1)) else {
++                Issue.record("Failed to allocate speculative slot for \(expert)")
++                continue
++            }
++            allocatedSlots.append(slot)
++            // Complete DMA
++            ring.markReady(slotIndex: slot.index, ticket: UInt64(e + 1))
++            // Bind to compute encoder
++            ring.markInUse(slotIndex: slot.index, ticket: UInt64(e + 1))
++            // Release from compute encoder
++            ring.releaseFromUse(slotIndex: slot.index, ticket: UInt64(e + 1))
++        }
++
++        // ASSERT THE INVARIANT:
++        // Pre-routing predictions, loading, and readying MUST NOT modify slot lastAccessedTimestamp!
++        for slot in allocatedSlots {
++            #expect(slot.lastAccessedTimestamp == 0, "Slot \(slot.index) lastAccessedTimestamp must remain 0 during pre-routing")
++        }
++
++        // LRUWeightTracker MUST have zero knowledge of pre-routed experts
++        #expect(tracker.count == 0, "Tracker must have 0 resident experts before execution log drain")
++        #expect(tracker.lruExpert == nil, "Tracker must have no LRU victim")
++        for e in 0..<4 {
++            let expert = ExpertKey(layer: 5, expert: e)
++            #expect(!tracker.contains(expert: expert), "Tracker must NOT contain pre-routed \(expert)")
++        }
++
++        // Step 2: Speculative branch cancellation / abandonment
++        // Speculative prefetch for L6E10 that is never dispatched
++        guard let cancelledSlot = ring.allocateSlot(for: ExpertKey(layer: 6, expert: 10), ticket: 99) else {
++            Issue.record("Failed to allocate cancelled slot")
++            return
++        }
++        ring.markAbandoned(slotIndex: cancelledSlot.index)
++        ring.reclaim(slotIndex: cancelledSlot.index)
++        #expect(cancelledSlot.lastAccessedTimestamp == 0)
++        #expect(!tracker.contains(expert: ExpertKey(layer: 6, expert: 10)))
++
++        // Step 3: GPU Execution Log commits ONLY actually executed decisions
++        // Suppose native gating actually selected ONLY L5E1 and L5E3 (L5E0 and L5E2 were bypassed)
++        let logPtr = log.buffer.contents().bindMemory(to: ExecutionLogEntry.self, capacity: log.capacity)
++        logPtr[0] = ExecutionLogEntry(
++            tokenIndex: 1, layerIndex: 5, horizonIndex: 1, expertID: 1,
++            confidenceScore: 0.95, timestamp: 100_000
++        )
++        logPtr[1] = ExecutionLogEntry(
++            tokenIndex: 2, layerIndex: 5, horizonIndex: 1, expertID: 3,
++            confidenceScore: 0.98, timestamp: 200_000
++        )
++
++        // Step 4: CPU Drains Execution Log post-execution
++        let drained = log.drain()
++        #expect(drained.count == 2)
++
++        for entry in drained {
++            let expert = ExpertKey(layer: Int(entry.layerIndex), expert: Int(entry.expertID))
++            tracker.recordAccess(expert: expert, timestamp: entry.timestamp)
++            if let slot = ring.findReadySlot(for: expert) {
++                ring.updateLRUTimestamp(slotIndex: slot.index, timestamp: entry.timestamp)
++            }
++        }
++
++        // Verify post-drain invariants:
++        // ONLY L5E1 and L5E3 have non-zero timestamps
++        let readySlot1 = ring.findReadySlot(for: ExpertKey(layer: 5, expert: 1))
++        let readySlot3 = ring.findReadySlot(for: ExpertKey(layer: 5, expert: 3))
++        let readySlot0 = ring.findReadySlot(for: ExpertKey(layer: 5, expert: 0))
++        let readySlot2 = ring.findReadySlot(for: ExpertKey(layer: 5, expert: 2))
++
++        #expect(readySlot1?.lastAccessedTimestamp == 100_000)
++        #expect(readySlot3?.lastAccessedTimestamp == 200_000)
++        #expect(readySlot0?.lastAccessedTimestamp == 0, "Unexecuted speculative slot must remain at timestamp 0")
++        #expect(readySlot2?.lastAccessedTimestamp == 0, "Unexecuted speculative slot must remain at timestamp 0")
++
++        #expect(tracker.count == 2)
++        #expect(tracker.contains(expert: ExpertKey(layer: 5, expert: 1)))
++        #expect(tracker.contains(expert: ExpertKey(layer: 5, expert: 3)))
++        #expect(!tracker.contains(expert: ExpertKey(layer: 5, expert: 0)))
++        #expect(!tracker.contains(expert: ExpertKey(layer: 5, expert: 2)))
++
++        // Step 5: LRU Eviction ordering preference
++        // When ring buffer saturates, allocateSlot must evict slots with timestamp 0 before slots with timestamp > 0!
++        // Fill remaining free slots (slots 4, 5, 6, 7)
++        for i in 4..<8 {
++            let expert = ExpertKey(layer: 7, expert: i)
++            let s = ring.allocateSlot(for: expert, ticket: UInt64(10 + i))
++            #expect(s != nil)
++            ring.markReady(slotIndex: s!.index, ticket: UInt64(10 + i))
++        }
++
++        // All 8 slots are now .ready. The next allocation MUST evict a slot with lastAccessedTimestamp == 0!
++        let newExpert = ExpertKey(layer: 8, expert: 42)
++        guard let victimSlot = ring.allocateSlot(for: newExpert, ticket: 100) else {
++            Issue.record("Ring buffer eviction failed")
++            return
++        }
++        // Victim MUST have been an unexecuted slot (timestamp 0), NOT slot 1 or 3!
++        #expect(victimSlot.index != readySlot1?.index, "Executed slot 1 must not be evicted ahead of unexecuted slots")
++        #expect(victimSlot.index != readySlot3?.index, "Executed slot 3 must not be evicted ahead of unexecuted slots")
++    }
++
++    // MARK: - 5. Concurrent GPU Write & CPU Drain Stress Testing
++
++    @Test("Concurrent GPU parallel writes and CPU drain stress testing with zero data corruption")
++    func testConcurrentLogWriteAndDrain() throws {
++        let ctx = MetalContext.shared
++        let pipeline = try ctx.makeComputePipelineState(
++            source: SyntheticExecutionLogShaders.parallelLogWriterSource,
++            functionName: "parallelLogWriter"
++        )
++
++        let capacity = 4096
++        let log = GPUExecutionLog(device: ctx.device, capacity: capacity)
++        let tracker = LRUWeightTracker()
++
++        let numBatches = 25
++        let batchSize = 64
++        let totalExpected = numBatches * batchSize
++
++        var drainedEntries: [ExecutionLogEntry] = []
++        let drainLock = NSLock()
++        let group = DispatchGroup()
++        let syncLock = NSLock()
++        var gpuFinished = false
++
++        // Background GPU Dispatch Worker
++        group.enter()
++        DispatchQueue.global(qos: .userInitiated).async {
++            for b in 0..<numBatches {
++                var startToken = UInt32(b * batchSize)
++                var baseTime = UInt64(b * 10_000 + 100)
++                var expBase = UInt32(b * 2)
++                var cap = UInt32(capacity)
++
++                guard let cmdBuf = ctx.commandQueue.makeCommandBuffer(),
++                      let enc = cmdBuf.makeComputeCommandEncoder() else {
++                    break
++                }
++                enc.setComputePipelineState(pipeline)
++                enc.setBuffer(log.buffer, offset: 0, index: 0)
++                enc.setBytes(&cap, length: 4, index: 1)
++                enc.setBytes(&startToken, length: 4, index: 2)
++                enc.setBytes(&baseTime, length: 8, index: 3)
++                enc.setBytes(&expBase, length: 4, index: 4)
++
++                let gridSize = MTLSize(width: batchSize, height: 1, depth: 1)
++                let threadgroupSize = MTLSize(width: min(pipeline.maxTotalThreadsPerThreadgroup, batchSize), height: 1, depth: 1)
++                enc.dispatchThreads(gridSize, threadsPerThreadgroup: threadgroupSize)
++                enc.endEncoding()
++                cmdBuf.commit()
++                cmdBuf.waitUntilCompleted()
++
++                usleep(150)
++            }
++
++            syncLock.lock()
++            gpuFinished = true
++            syncLock.unlock()
++            group.leave()
++        }
++
++        // Concurrent CPU Drain Worker
++        group.enter()
++        DispatchQueue.global(qos: .default).async {
++            while true {
++                let batch = log.drain()
++                if !batch.isEmpty {
++                    drainLock.lock()
++                    drainedEntries.append(contentsOf: batch)
++                    for e in batch {
++                        let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
++                        tracker.recordAccess(expert: key, timestamp: e.timestamp)
++                    }
++                    drainLock.unlock()
++                }
++
++                syncLock.lock()
++                let done = gpuFinished
++                syncLock.unlock()
++                if done { break }
++                usleep(100)
++            }
++
++            // Final drain sweeps to drain any residual entries
++            for _ in 0..<5 {
++                let batch = log.drain()
++                if !batch.isEmpty {
++                    drainLock.lock()
++                    drainedEntries.append(contentsOf: batch)
++                    for e in batch {
++                        let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
++                        tracker.recordAccess(expert: key, timestamp: e.timestamp)
++                    }
++                    drainLock.unlock()
++                }
++                usleep(50)
++            }
++            group.leave()
++        }
++
++        group.wait()
++
++        // Assert all entries were drained with zero loss
++        #expect(drainedEntries.count == totalExpected, "Expected exactly \(totalExpected) drained entries, got \(drainedEntries.count)")
++
++        // Assert zero data corruption across drained entries
++        for entry in drainedEntries {
++            #expect(entry.confidenceScore == 0.88, "Corrupted confidenceScore: \(entry.confidenceScore)")
++            #expect(entry.layerIndex >= 5 && entry.layerIndex <= 24, "Corrupted layerIndex: \(entry.layerIndex)")
++            #expect(entry.horizonIndex >= 1 && entry.horizonIndex <= 3, "Corrupted horizonIndex: \(entry.horizonIndex)")
++            #expect(entry.expertID < 60, "Corrupted expertID: \(entry.expertID)")
++            #expect(entry.padding == 0, "Corrupted padding: \(entry.padding)")
++            #expect((entry.reserved & 0xFFFFFFFF00000000) == 0x55AA55AA00000000, "Corrupted reserved field: \(entry.reserved)")
++        }
++
++        #expect(tracker.totalUpdates == totalExpected)
++        #expect(tracker.count > 0 && tracker.count <= 1200, "Tracker count should be within valid bounds for deep layers x experts")
++        #expect(tracker.lruExpert != nil)
++    }
++
++    // MARK: - 6. Synthetic MSL Gating & Logging Kernel Compilation
++
++    @Test("Synthetic MSL gating and logging kernel compiles cleanly via MetalContext")
++    func testSyntheticGatingAndLogKernelCompilation() throws {
++        let ctx = MetalContext.shared
++        let pipeline = try ctx.makeComputePipelineState(
++            source: SyntheticExecutionLogShaders.mockGatingAndLogSource,
++            functionName: "syntheticGatingAndLog"
++        )
++        #expect(pipeline.maxTotalThreadsPerThreadgroup > 0)
++
++        // Execute synthetic gating for 64 tokens
++        let count = 64
++        let log = GPUExecutionLog(device: ctx.device, capacity: 256)
++        var cap = UInt32(log.capacity)
++        var tokenOffset: UInt32 = 0
++        var layerIndex: UInt16 = 8
++        var horizonIndex: UInt16 = 2
++        var numExperts: UInt32 = 60
++        var baseTimestamp: UInt64 = 1_000_000
++
++        guard let cmdBuf = ctx.commandQueue.makeCommandBuffer(),
++              let enc = cmdBuf.makeComputeCommandEncoder() else {
++            Issue.record("Failed to create Metal command buffer or encoder")
++            return
++        }
++        enc.setComputePipelineState(pipeline)
++        enc.setBuffer(log.buffer, offset: 0, index: 0)
++        enc.setBytes(&cap, length: 4, index: 1)
++        enc.setBytes(&tokenOffset, length: 4, index: 2)
++        enc.setBytes(&layerIndex, length: 2, index: 3)
++        enc.setBytes(&horizonIndex, length: 2, index: 4)
++        enc.setBytes(&numExperts, length: 4, index: 5)
++        enc.setBytes(&baseTimestamp, length: 8, index: 6)
++
++        let gridSize = MTLSize(width: count, height: 1, depth: 1)
++        let threadgroupSize = MTLSize(width: min(pipeline.maxTotalThreadsPerThreadgroup, count), height: 1, depth: 1)
++        enc.dispatchThreads(gridSize, threadsPerThreadgroup: threadgroupSize)
++        enc.endEncoding()
++        cmdBuf.commit()
++        cmdBuf.waitUntilCompleted()
++
++        let drained = log.drain()
++        #expect(drained.count == count)
++        for (i, entry) in drained.enumerated() {
++            #expect(entry.tokenIndex == UInt32(i))
++            #expect(entry.layerIndex == 8)
++            #expect(entry.horizonIndex == 2)
++            #expect(entry.confidenceScore >= 0.50 && entry.confidenceScore <= 1.0)
++            #expect(entry.reserved == 0xCAFEBABEDEADBEEF)
++        }
++    }
++
++    // MARK: - 7. Retained Regression & Memory Budget Tests
++
+     @Test("Execution log drains zero entries when buffer is zeroed")
+     func testEmptyLogDrain() {
+         let log = GPUExecutionLog(device: device, capacity: 64)
+@@ -71,15 +708,12 @@
+         #expect(!src.contains("atomic_"))
+     }
+ 
+-    // MARK: - Memory Budget Tests
+-
+     @Test("MemoryBudgetConfig conservative budget calculation")
+     func testMemoryBudgetTotal() {
+         let budget = MemoryBudgetConfig()
+         let arch = MoEArchitectureConfig.synthetic
+         let total = budget.totalConservativeBudgetBytes(for: arch)
+-        // Must fit in available RAM (well under 8GB for synthetic)
+-        #expect(total < 1_000_000_000) // < 1 GB for synthetic config
++        #expect(total < 1_000_000_000)
+     }
+ 
+     @Test("MemoryBudgetConfig page alignment check")

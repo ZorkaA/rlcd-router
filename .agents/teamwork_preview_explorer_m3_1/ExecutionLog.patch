@@ -1,0 +1,315 @@
+diff --git a/Sources/AsyncMoERouter/ExecutionPipeline/ExecutionLog.swift b/Sources/AsyncMoERouter/ExecutionPipeline/ExecutionLog.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/AsyncMoERouter/ExecutionPipeline/ExecutionLog.swift
+@@ -0,0 +1,280 @@
++import Foundation
++import Metal
++import os.log
++import os
++
++/// Pre-allocated unified memory circular ring buffer for recording GPU expert routing decisions.
++///
++/// # Requirement R3 Architecture
++/// - **Pre-allocated Unified Memory**: Exactly 4096 entries × 32 bytes = 131,072 bytes (128 KB),
++///   allocated with `.storageModeShared` on Apple Silicon UMA (8 × 16 KB pages).
++/// - **Zero GPU Atomic Contention**: Eliminates `atomic_fetch_add_explicit` on unified memory.
++///   Gating kernels write deterministically via per-token rank indexing:
++///   `slot = ((tokenIndex * expertsPerToken) + rank) & (capacity - 1)`.
++/// - **Dispatch-Time LRU Authority**: CPU drains this buffer post-execution to update
++///   `LRUWeightTracker`. Timestamps are NEVER updated during pre-routing speculative predictions.
++/// - **Thread Safety**: State transitions and head advances are protected by `OSAllocatedUnfairLock`.
++public final class ExecutionLog: @unchecked Sendable {
++    // MARK: - Constants
++    
++    /// Default circular buffer capacity (4096 entries = 128 KB).
++    public static let defaultCapacity: Int = 4096
++    
++    /// Expected byte size of a single ExecutionLogEntry (32 bytes).
++    public static let entryByteSize: Int = 32
++    
++    /// Total buffer capacity in number of entries.
++    public let capacity: Int
++    
++    /// Pre-allocated Metal buffer in unified memory (`.storageModeShared`).
++    public let buffer: any MTLBuffer
++    
++    // MARK: - Internal State Protected by Unfair Lock
++    
++    private struct State {
++        var readHead: Int = 0
++        var totalEntriesDrained: Int = 0
++        var totalEntriesLogged: Int = 0
++    }
++    
++    private let _state: OSAllocatedUnfairLock<State>
++    private let _log = Logger(subsystem: "AsyncMoERouter", category: "ExecutionLog")
++    
++    // MARK: - Public Properties
++    
++    /// Direct typed pointer to the circular buffer memory in Apple Silicon unified memory.
++    /// Provides zero-copy CPU access without memory copies or staging buffers.
++    public var entryPointer: UnsafeMutablePointer<ExecutionLogEntry> {
++        buffer.contents().bindMemory(to: ExecutionLogEntry.self, capacity: capacity)
++    }
++    
++    /// Current logical read head index within the ring buffer [0 ..< capacity].
++    public var readHead: Int {
++        _state.withLock { $0.readHead }
++    }
++    
++    /// Total cumulative entries drained by the CPU since initialization or reset.
++    public var totalEntriesDrained: Int {
++        _state.withLock { $0.totalEntriesDrained }
++    }
++    
++    /// Total cumulative entries logged (tracked when using host-assisted or batch interfaces).
++    public var totalEntriesLogged: Int {
++        _state.withLock { $0.totalEntriesLogged }
++    }
++    
++    // MARK: - Initialization
++    
++    /// Initializes a pre-allocated circular Execution Log in Apple Silicon unified memory.
++    ///
++    /// - Parameters:
++    ///   - device: The primary `MTLDevice`.
++    ///   - capacity: Ring buffer capacity in entries (default: 4096, must be a power of 2).
++    public init(device: any MTLDevice, capacity: Int = defaultCapacity) {
++        precondition(capacity > 0, "ExecutionLog capacity must be positive")
++        precondition((capacity & (capacity - 1)) == 0, "ExecutionLog capacity must be a power of 2 for zero-atomic bitwise indexing")
++        precondition(
++            MemoryLayout<ExecutionLogEntry>.stride == Self.entryByteSize,
++            "ExecutionLogEntry stride (\(MemoryLayout<ExecutionLogEntry>.stride)) must be exactly \(Self.entryByteSize) bytes"
++        )
++        
++        self.capacity = capacity
++        let sizeBytes = capacity * MemoryLayout<ExecutionLogEntry>.stride
++        
++        // Allocate buffer in .storageModeShared with default hazard tracking (MTLResourceHazardTrackingModeTracked)
++        guard let buf = device.makeBuffer(length: sizeBytes, options: .storageModeShared) else {
++            fatalError("ExecutionLog: Failed to allocate \(sizeBytes) bytes in .storageModeShared")
++        }
++        buf.label = "GPUExecutionLogBuffer"
++        
++        // Zero-initialize entire buffer to ensure deterministic sentinel states
++        memset(buf.contents(), 0, sizeBytes)
++        self.buffer = buf
++        self._state = OSAllocatedUnfairLock(initialState: State())
++        
++        _log.info("ExecutionLog initialized: \(capacity) entries × \(Self.entryByteSize) B = \(sizeBytes) B (\(sizeBytes / 1024) KB, \(sizeBytes / 16384) pages)")
++    }
++    
++    // MARK: - Buffer Management & Draining
++    
++    /// Resets the ring buffer: zeros out all memory in `.storageModeShared` and resets read/write heads.
++    public func reset() {
++        _state.withLock { state in
++            state.readHead = 0
++            state.totalEntriesDrained = 0
++            state.totalEntriesLogged = 0
++        }
++        let sizeBytes = capacity * MemoryLayout<ExecutionLogEntry>.stride
++        memset(buffer.contents(), 0, sizeBytes)
++        _log.debug("ExecutionLog reset: buffer zeroed, readHead set to 0")
++    }
++    
++    /// Reads a window of entries starting at `fromIndex` for `count` entries, handling ring wrap-around.
++    ///
++    /// - Parameters:
++    ///   - fromIndex: The logical starting index.
++    ///   - count: Number of entries to read (0 ... capacity).
++    /// - Returns: Array of `ExecutionLogEntry` records copied from the buffer.
++    public func readEntries(fromIndex: Int, count: Int) -> [ExecutionLogEntry] {
++        precondition(fromIndex >= 0, "fromIndex must be non-negative")
++        precondition(count >= 0 && count <= capacity, "count must be between 0 and capacity (\(capacity))")
++        guard count > 0 else { return [] }
++        
++        let ptr = entryPointer
++        let mask = capacity - 1
++        var results = [ExecutionLogEntry]()
++        results.reserveCapacity(count)
++        
++        for i in 0..<count {
++            let slot = (fromIndex + i) & mask
++            results.append(ptr[slot])
++        }
++        return results
++    }
++    
++    /// Drains all newly written entries from the GPU Execution Log.
++    ///
++    /// Consumes entries sequentially from `readHead` until an unwritten (zeroed) sentinel slot
++    /// is encountered. Consumed slots are cleared to zero to ensure clean subsequent drains.
++    ///
++    /// - Returns: Array of valid `ExecutionLogEntry` records written since the last drain.
++    public func drain() -> [ExecutionLogEntry] {
++        return _state.withLock { state in
++            let ptr = entryPointer
++            let mask = capacity - 1
++            var entries = [ExecutionLogEntry]()
++            var scanned = 0
++            
++            while scanned < capacity {
++                let slot = (state.readHead + scanned) & mask
++                let entry = ptr[slot]
++                
++                // Sentinel test: unwritten slots have tokenIndex == 0 AND timestamp == 0 AND confidenceScore == 0
++                guard entry.tokenIndex != 0 || entry.timestamp != 0 || entry.confidenceScore != 0 else {
++                    break
++                }
++                
++                entries.append(entry)
++                
++                // Clear entry after consumption so subsequent drains do not re-process stale slots
++                ptr[slot] = ExecutionLogEntry(
++                    tokenIndex: 0,
++                    layerIndex: 0,
++                    horizonIndex: 0,
++                    expertID: 0,
++                    confidenceScore: 0,
++                    timestamp: 0,
++                    reserved: 0
++                )
++                scanned += 1
++            }
++            
++            state.readHead = (state.readHead + scanned) & mask
++            state.totalEntriesDrained += scanned
++            
++            if scanned > 0 {
++                let total = state.totalEntriesDrained
++                _log.debug("ExecutionLog: Drained \(scanned) entries (total drained: \(total))")
++            }
++            
++            return entries
++        }
++    }
++    
++    /// Subscript access for direct slot inspection (bounds-checked modulo capacity).
++    public subscript(index: Int) -> ExecutionLogEntry {
++        get {
++            let slot = index & (capacity - 1)
++            return entryPointer[slot]
++        }
++        set {
++            let slot = index & (capacity - 1)
++            entryPointer[slot] = newValue
++        }
++    }
++    
++    // MARK: - MSL Shader Source
++    
++    /// Embedded MSL kernel source code providing zero-atomic GPU execution logging.
++    ///
++    /// # Key Invariants
++    /// - **Zero Atomics**: No `atomic_fetch_add_explicit` or atomic variables.
++    /// - **Deterministic Indexing**: Slot addresses are calculated directly via bitwise masking:
++    ///   - Formula A: `slot = ((tokenIndex * expertsPerToken) + rank) & (logCapacity - 1)`
++    ///   - Formula B: `slot = (baseSlotIndex + thread_position_in_grid) & (logCapacity - 1)`
++    /// - **Hazard Tracking**: Buffers must use default hazard tracking (`MTLResourceHazardTrackingModeTracked`).
++    public static let mslKernelSource: String = """
++    #include <metal_stdlib>
++    using namespace metal;
++
++    /// Exact 32-byte C-layout entry written by GPU gating threadgroups into the circular Execution Log.
++    struct ExecutionLogEntry {
++        uint   tokenIndex;       // Bytes 0..3   (align 4)
++        ushort layerIndex;       // Bytes 4..5   (align 2)
++        ushort horizonIndex;     // Bytes 6..7   (align 2)
++        ushort expertID;         // Bytes 8..9   (align 2)
++        ushort padding;          // Bytes 10..11 (align 2)
++        float  confidenceScore;  // Bytes 12..15 (align 4)
++        ulong  timestamp;        // Bytes 16..23 (align 8)
++        ulong  reserved;         // Bytes 24..31 (align 8)
++    };
++
++    /// Deterministic single-token/expert logging kernel.
++    /// Zero atomic operations: slot is computed directly from token and layer indices.
++    kernel void writeExecutionLogEntry(
++        device ExecutionLogEntry* log           [[buffer(0)]],
++        constant uint&            logCapacity   [[buffer(1)]],
++        constant uint&            tokenIndex    [[buffer(2)]],
++        constant ushort&          layerIndex    [[buffer(3)]],
++        constant ushort&          horizonIndex  [[buffer(4)]],
++        constant ushort&          expertID      [[buffer(5)]],
++        constant float&           confidence    [[buffer(6)]],
++        constant ulong&           timestamp     [[buffer(7)]],
++        uint                      tid           [[thread_position_in_grid]]
++    ) {
++        if (tid != 0) return;
++
++        // Deterministic slot calculation: zero atomics, single-cycle bitwise masking
++        uint slot = (tokenIndex * 20u * 4u + layerIndex * 4u + horizonIndex) & (logCapacity - 1u);
++        device ExecutionLogEntry& entry = log[slot];
++        entry.tokenIndex      = tokenIndex;
++        entry.layerIndex      = layerIndex;
++        entry.horizonIndex    = horizonIndex;
++        entry.expertID        = expertID;
++        entry.padding         = 0;
++        entry.confidenceScore = confidence;
++        entry.timestamp       = timestamp;
++        entry.reserved        = 0;
++    }
++
++    /// Parallel token gating logger: logs top-K routed experts for a token simultaneously.
++    /// Each thread corresponds to an expert rank [0 ..< topK], writing to a disjoint slot.
++    kernel void writeTokenGatingLog(
++        device ExecutionLogEntry* log             [[buffer(0)]],
++        constant uint&            logCapacity     [[buffer(1)]],
++        constant uint&            tokenIndex      [[buffer(2)]],
++        constant ushort&          layerIndex      [[buffer(3)]],
++        device const ushort*      selectedExperts [[buffer(4)]],
++        device const float*       routingWeights  [[buffer(5)]],
++        constant ulong&           dispatchTime    [[buffer(6)]],
++        constant uint&            topK            [[buffer(7)]],
++        uint                      rank            [[thread_position_in_grid]]
++    ) {
++        if (rank >= topK) return;
++
++        // Zero-atomic deterministic slot assignment: ((tokenIndex * topK) + rank) & (logCapacity - 1)
++        uint slot = (tokenIndex * topK + rank) & (logCapacity - 1u);
++        device ExecutionLogEntry& entry = log[slot];
++        entry.tokenIndex      = tokenIndex;
++        entry.layerIndex      = layerIndex;
++        entry.horizonIndex    = 1;
++        entry.expertID        = selectedExperts[rank];
++        entry.padding         = 0;
++        entry.confidenceScore = routingWeights[rank];
++        entry.timestamp       = dispatchTime + (ulong)rank;
++        entry.reserved        = 0;
++    }
++
++    /// Sequential batch logging kernel using host-assigned base slot offset.
++    /// Prevents atomic contention by granting a private window [baseSlotIndex, baseSlotIndex + count).
++    kernel void writeExecutionLogBatch(
++        device ExecutionLogEntry* log           [[buffer(0)]],
++        constant uint&            logCapacity   [[buffer(1)]],
++        constant uint&            baseSlotIndex [[buffer(2)]],
++        constant uint&            tokenIndex    [[buffer(3)]],
++        constant ushort&          layerIndex    [[buffer(4)]],
++        device const ushort*      expertIDs     [[buffer(5)]],
++        device const float*       confidences   [[buffer(6)]],
++        constant ulong&           timestamp     [[buffer(7)]],
++        constant uint&            numExperts    [[buffer(8)]],
++        uint                      tid           [[thread_position_in_grid]]
++    ) {
++        if (tid >= numExperts) return;
++
++        uint slot = (baseSlotIndex + tid) & (logCapacity - 1u);
++        device ExecutionLogEntry& entry = log[slot];
++        entry.tokenIndex      = tokenIndex;
++        entry.layerIndex      = layerIndex;
++        entry.horizonIndex    = 1;
++        entry.expertID        = expertIDs[tid];
++        entry.padding         = 0;
++        entry.confidenceScore = confidences[tid];
++        entry.timestamp       = timestamp + (ulong)tid;
++        entry.reserved        = 0;
++    }
++    """
++}
++
++// MARK: - Backward Compatibility Alias
++/// Typealias preserving 100% compatibility with existing references to `GPUExecutionLog`.
++public typealias GPUExecutionLog = ExecutionLog

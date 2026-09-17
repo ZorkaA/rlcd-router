@@ -1,3 +1,204 @@
+# Handoff Report: Milestone 3 Automated Unit Test Harness & Synthetic GPU Verification
+
+**Agent**: `teamwork_preview_explorer_m3_3`  
+**Milestone**: Phase 2 Milestone 3 (GPU Execution Log & Dispatch-Time LRU Tracking — Requirement R3)  
+**Date**: 2026-09-17T21:46:00Z  
+**Type**: Hard Handoff (Investigation & Test Design Complete)
+
+---
+
+## 1. Observation
+
+### 1.1 Existing Implementations & Layout
+- **`Sources/AsyncMoERouter/Common/Types.swift` (Lines 110–148)**:
+  ```swift
+  @frozen
+  public struct ExecutionLogEntry: Sendable, Equatable {
+      public var tokenIndex: UInt32      // Bytes 0..3
+      public var layerIndex: UInt16      // Bytes 4..5
+      public var horizonIndex: UInt16    // Bytes 6..7
+      public var expertID: UInt16        // Bytes 8..9
+      public var padding: UInt16         // Bytes 10..11
+      public var confidenceScore: Float32// Bytes 12..15
+      public var timestamp: UInt64       // Bytes 16..23
+      public var reserved: UInt64        // Bytes 24..31
+  }
+  ```
+  Verified via Swift reflection and memory layout APIs:
+  - `MemoryLayout<ExecutionLogEntry>.size == 32`
+  - `MemoryLayout<ExecutionLogEntry>.stride == 32`
+  - `MemoryLayout<ExecutionLogEntry>.alignment == 8`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.tokenIndex) == 0`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.layerIndex) == 4`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.horizonIndex) == 6`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.expertID) == 8`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.padding) == 10`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.confidenceScore) == 12`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.timestamp) == 16`
+  - `MemoryLayout<ExecutionLogEntry>.offset(of: \.reserved) == 24`
+
+- **`Sources/AsyncMoERouter/ExecutionLog/GPUExecutionLog.swift` (Lines 13–83)**:
+  - Pre-allocated `MTLBuffer` in `.storageModeShared` sized `capacity * 32` (default 4,096 entries = 131,072 bytes / 128 KB).
+  - Drain mechanism (`drain() -> [ExecutionLogEntry]`) maintains `_readHead` starting at 0, scanning forward in ring order:
+    ```swift
+    let idx = (_readHead + scanned) % capacity
+    let entry = ptr[idx]
+    guard entry.tokenIndex != 0 || entry.timestamp != 0 else { break }
+    entries.append(entry)
+    ptr[idx] = ExecutionLogEntry(tokenIndex: 0, layerIndex: 0, horizonIndex: 0, expertID: 0, confidenceScore: 0)
+    scanned += 1
+    ```
+  - Crucial observation: `drain()` stops scanning upon encountering any slot with `tokenIndex == 0 && timestamp == 0`. Therefore, slot assignments must start contiguously from slot 0, or `_readHead` must match the GPU write head.
+
+- **`Sources/AsyncMoERouter/ExecutionLog/LRUWeightTracker.swift` (Lines 15–115)**:
+  - Implements $O(1)$ doubly-linked list with hash map (`_map: [ExpertKey: Node]`).
+  - `recordAccess(expert: ExpertKey, timestamp: UInt64)` inserts or promotes node to head ($O(1)$).
+  - `lruExpert` returns `_tail.prev?.key` ($O(1)$).
+  - `evictLRU() -> ExpertKey?` evicts and removes the tail node ($O(1)$).
+
+- **`Sources/AsyncMoERouter/BufferPools/SpeculativeRingBuffer.swift` (Lines 394–408)**:
+  - `updateLRUTimestamp(slotIndex: Int, timestamp: UInt64)` directly mutates `slot.lastAccessedTimestamp`.
+  - In `allocateSlot(for:ticket:)`, when `.free` slots are exhausted, eviction candidate is selected via:
+    ```swift
+    let evictable = state.slots.filter { if case .ready = $0.state { return true }; return false }
+    guard let victim = evictable.min(by: { $0.lastAccessedTimestamp < $1.lastAccessedTimestamp }) else { return nil }
+    ```
+  - At slot creation, prefetching (`.loading`), and readying (`.ready`), `lastAccessedTimestamp` remains `0`.
+
+### 1.2 Runtime MSL Compilation Defect Discovered in `GPUExecutionLog.swift`
+When compiling `GPUExecutionLog.mslKernelSource` at line 128:
+```metal
+entry.timestamp = clock();
+```
+Metal compiler returns verbatim error:
+```
+Compilation error: Error Domain=MTLLibraryErrorDomain Code=3 "program_source:34:28: error: use of undeclared identifier 'clock'
+    entry.timestamp      = clock();
+                           ^
+" UserInfo={NSLocalizedDescription=program_source:34:28: error: use of undeclared identifier 'clock'
+```
+Metal Shading Language does not provide a standard parameterless `clock()` function on Apple Silicon. Real or synthetic shaders must accept a timestamp via constant buffer (e.g. `constant ulong& baseTimestamp [[buffer(X)]]`) or calculate monotonic offsets from thread IDs.
+
+### 1.3 Proposed Test Suite Execution Results
+Executing the complete 15-test suite via `swift test --filter ExecutionLogTests`:
+```
+Building for debugging...
+Build complete! (4.59 sec)
+◇ Suite "Execution Log Tests" started.
+✔ Test "MemoryBudgetConfig sector alignment check" passed after 0.056 seconds.
+✔ Test "ExecutionLogEntry exact 32-byte size, stride, alignment, and field offsets" passed after 0.056 seconds.
+✔ Test "MemoryBudgetConfig page alignment check" passed after 0.056 seconds.
+✔ Test "MemoryBudgetConfig conservative budget calculation" passed after 0.056 seconds.
+✔ Test "Execution log MSL shader source is valid metal syntax" passed after 0.056 seconds.
+✔ Test "Execution log drains multiple sequential entries" passed after 0.056 seconds.
+✔ Test "Execution log drains zero entries when buffer is zeroed" passed after 0.056 seconds.
+✔ Test "Execution log buffer size is correct (capacity × 32)" passed after 0.056 seconds.
+✔ Test "Execution log clears entries after drain" passed after 0.056 seconds.
+✔ Test "Post-execution CPU log draining integrates with LRUWeightTracker and resets slots" passed after 0.056 seconds.
+✔ Test "Strict Requirement R3: Speculative pre-routing does NOT update LRU timestamps, only log drain does" passed after 0.057 seconds.
+✔ Test "Zero-atomic circular log buffer 5,000 entries wraparound and indexing math" passed after 0.066 seconds.
+✔ Test "Synthetic MSL gating and logging kernel compiles cleanly via MetalContext" passed after 0.067 seconds.
+✔ Test "GPU runtime kernel circular wraparound via MetalContext" passed after 0.067 seconds.
+✔ Test "Concurrent GPU parallel writes and CPU drain stress testing with zero data corruption" passed after 0.093 seconds.
+✔ Suite "Execution Log Tests" passed after 0.093 seconds.
+✔ Test run with 15 tests in 1 suite passed after 0.093 seconds.
+```
+
+---
+
+## 2. Logic Chain
+
+1. **Exact 32-Byte Memory Alignment (Obs 1.1)**:
+   - For unified memory zero-copy sharing between GPU and CPU, struct fields in Swift must align with MSL memory rules.
+   - `ExecutionLogEntry` comprises UInt32 (4B) + 4×UInt16 (8B) + Float32 (4B) + 2×UInt64 (16B) = 32 bytes with 8-byte alignment.
+   - `testExecutionLogEntryAlignmentAndLayout` asserts every individual field offset and performs bitwise serialization tests, guaranteeing zero padding divergence between CPU and Metal GPU threadgroups.
+
+2. **Zero-Atomic Circular Buffer Wraparound & Boundary Safety (Obs 1.1, Obs 1.3)**:
+   - Writing 5,000 entries into a 4,096-entry buffer requires modulo indexing: `slot = globalToken % 4096`.
+   - In `testZeroAtomicCircularLogBufferWrap`, 5,000 entries are written into a buffer equipped with a 64-byte trailing canary guard (`0xAA`).
+   - The test proves:
+     - All writes map into `[0, 4095]`.
+     - Slots 0..<904 are overwritten by tokens 4096..<5000.
+     - Slots 904..<4096 retain first-pass tokens 904..<4096.
+     - Canary guard memory remains strictly intact, proving zero out-of-bounds writes.
+   - `testGPUExecutionLogKernelWraparound` proves this same indexing math holds when executed by actual GPU compute threadgroups compiled via `MetalContext.shared`.
+
+3. **Post-Execution CPU Log Draining & LRU Weight Tracker Integration (Obs 1.1, Obs 1.3)**:
+   - In `testCPULogDrainPostExecution`, `GPUExecutionLog.drain()` retrieves batch entries in FIFO order, clears drained slots to zero, and confirms that subsequent calls immediately return `[]`.
+   - Drained entries feed directly into `LRUWeightTracker.recordAccess(expert:timestamp:)`. The test verifies that `tracker.lruExpert` precisely tracks the oldest accessed timestamp, and that newer batches promote reused experts to MRU head.
+
+4. **Enforcing Requirement R3 Post-Execution Invariant (Obs 1.1, Obs 1.3)**:
+   - Authoritative Requirement R3: *"The CPU must update LRU metadata only by draining the GPU Execution Log, never via pre-routing prediction."*
+   - In `testLRUUpdatedStrictlyPostExecution`:
+     - 4 candidate experts are speculatively pre-routed, allocated, readied, and bound to compute encoders.
+     - The test explicitly verifies that every slot has `lastAccessedTimestamp == 0` and `tracker.contains == false`.
+     - An abandoned speculative slot is reclaimed, and its timestamp remains 0.
+     - When the GPU logs actual executions for only 2 of the 4 candidates and the CPU drains the log, ONLY the 2 executed slots have timestamps > 0 and enter the LRU registry.
+     - When subsequent buffer saturation forces an LRU eviction, the test verifies that unexecuted slots (timestamp 0) are evicted ahead of executed slots.
+
+5. **Concurrent GPU Writes and CPU Draining Stress Test (Obs 1.1, Obs 1.3)**:
+   - In `testConcurrentLogWriteAndDrain`, a background GPU dispatch thread issues 25 sequential command buffer compute dispatches (1,600 total writes) while a concurrent CPU thread drains `log.drain()` and updates `LRUWeightTracker`.
+   - The test proves: zero crashes, zero deadlocks, exactly 1,600 drained entries, and zero corrupted fields across all tokens.
+
+6. **Synthetic MSL Gating & Logging Kernels (Obs 1.2, Obs 1.3)**:
+   - Provided `SyntheticExecutionLogShaders.mockGatingAndLogSource` and `parallelLogWriterSource`.
+   - Replaced invalid `clock()` with constant base timestamp + thread offset.
+   - Verified that `MetalContext.shared.makeComputePipelineState` compiles and executes the kernels at runtime.
+
+---
+
+## 3. Caveats
+
+1. **MSL `clock()` Function in `GPUExecutionLog.swift`**:
+   `GPUExecutionLog.mslKernelSource` at line 128 contains `entry.timestamp = clock();`. When production code is updated in Milestone 3, this must be amended to receive a timestamp buffer or parameter (as demonstrated in `SyntheticExecutionLogShaders`).
+2. **Contiguous Indexing Assumption**:
+   `GPUExecutionLog.drain()` stops at the first unwritten slot (`tokenIndex == 0 && timestamp == 0`). If a future gating implementation introduces non-contiguous slot gaps, `drain()` will require an explicit GPU write-head watermark or atomic ring pointer.
+3. **High-Load Command Buffer Visibility**:
+   Metal's default hazard tracking (`MTLResourceHazardTrackingModeTracked`) ensures visibility upon command buffer completion (`cmdBuf.waitUntilCompleted()` or `addCompletedHandler`). Concurrent reading while a single command buffer is actively writing is safe when threadgroup writes to disparate slots do not overlap with the read head.
+
+---
+
+## 4. Conclusion
+
+The comprehensive automated unit test harness for Milestone 3 has been designed, fully validated, and verified on Apple Silicon hardware. All 15 unit tests pass in 0.093s.
+
+The complete deliverables have been placed in the agent working directory:
+- **Complete Test Source**: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m3_3/proposed_ExecutionLogTests.swift`
+- **Machine-Applicable Patch**: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m3_3/ExecutionLogTests.patch`
+
+---
+
+## 5. Verification Method
+
+To independently verify the test harness:
+
+1. **Inspect Patch**:
+   ```bash
+   cat /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m3_3/ExecutionLogTests.patch
+   ```
+
+2. **Apply Patch or Copy Proposed File**:
+   ```bash
+   cp /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m3_3/proposed_ExecutionLogTests.swift \
+      /Users/jack/Downloads/rlcd-router/swift_tests/AsyncMoERouterTests/Unit/ExecutionLogTests.swift
+   ```
+
+3. **Execute Unit Tests**:
+   ```bash
+   swift test --filter ExecutionLogTests
+   ```
+   **Pass Condition**: All 15 tests in `Execution Log Tests` pass with 0 failures and 0 errors.
+
+4. **Revert Production File (Preserving Read-Only Working Tree)**:
+   ```bash
+   git checkout -- swift_tests/AsyncMoERouterTests/Unit/ExecutionLogTests.swift
+   ```
+
+---
+
+## 6. Complete Code Blueprint for `ExecutionLogTests.swift`
+
+```swift
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the AsyncMoERouter open source project
@@ -10,7 +211,6 @@
 import Testing
 import Metal
 import Foundation
-import os
 @testable import AsyncMoERouter
 
 /// Synthetic MSL shader sources for Milestone 3 runtime execution and stress tests.
@@ -482,7 +682,7 @@ struct ExecutionLogTests {
     // MARK: - 5. Concurrent GPU Write & CPU Drain Stress Testing
 
     @Test("Concurrent GPU parallel writes and CPU drain stress testing with zero data corruption")
-    func testConcurrentLogWriteAndDrain() async throws {
+    func testConcurrentLogWriteAndDrain() throws {
         let ctx = MetalContext.shared
         let pipeline = try ctx.makeComputePipelineState(
             source: SyntheticExecutionLogShaders.parallelLogWriterSource,
@@ -497,10 +697,15 @@ struct ExecutionLogTests {
         let batchSize = 64
         let totalExpected = numBatches * batchSize
 
-        let stateLock = OSAllocatedUnfairLock(initialState: (drained: [ExecutionLogEntry](), finished: false))
+        var drainedEntries: [ExecutionLogEntry] = []
+        let drainLock = NSLock()
+        let group = DispatchGroup()
+        let syncLock = NSLock()
+        var gpuFinished = false
 
         // Background GPU Dispatch Worker
-        let gpuTask = Task.detached(priority: .userInitiated) {
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
             for b in 0..<numBatches {
                 var startToken = UInt32(b * batchSize)
                 var baseTime = UInt64(b * 10_000 + 100)
@@ -525,63 +730,71 @@ struct ExecutionLogTests {
                 cmdBuf.commit()
                 cmdBuf.waitUntilCompleted()
 
-                try? await Task.sleep(nanoseconds: 150_000) // 150 us
+                usleep(150)
             }
 
-            stateLock.withLock { $0.finished = true }
+            syncLock.lock()
+            gpuFinished = true
+            syncLock.unlock()
+            group.leave()
         }
 
         // Concurrent CPU Drain Worker
-        let cpuTask = Task.detached(priority: .medium) {
+        group.enter()
+        DispatchQueue.global(qos: .default).async {
             while true {
                 let batch = log.drain()
                 if !batch.isEmpty {
-                    stateLock.withLock { $0.drained.append(contentsOf: batch) }
+                    drainLock.lock()
+                    drainedEntries.append(contentsOf: batch)
                     for e in batch {
                         let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
                         tracker.recordAccess(expert: key, timestamp: e.timestamp)
                     }
+                    drainLock.unlock()
                 }
 
-                let done = stateLock.withLock { $0.finished }
+                syncLock.lock()
+                let done = gpuFinished
+                syncLock.unlock()
                 if done { break }
-                try? await Task.sleep(nanoseconds: 100_000) // 100 us
+                usleep(100)
             }
 
             // Final drain sweeps to drain any residual entries
             for _ in 0..<5 {
                 let batch = log.drain()
                 if !batch.isEmpty {
-                    stateLock.withLock { $0.drained.append(contentsOf: batch) }
+                    drainLock.lock()
+                    drainedEntries.append(contentsOf: batch)
                     for e in batch {
                         let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
                         tracker.recordAccess(expert: key, timestamp: e.timestamp)
                     }
+                    drainLock.unlock()
                 }
-                try? await Task.sleep(nanoseconds: 50_000) // 50 us
+                usleep(50)
             }
+            group.leave()
         }
 
-        _ = await gpuTask.value
-        _ = await cpuTask.value
-
-        let drainedEntries = stateLock.withLock { $0.drained }
+        group.wait()
 
         // Assert all entries were drained with zero loss
-        #expect(drainedEntries.count == totalExpected)
+        #expect(drainedEntries.count == totalExpected, "Expected exactly \(totalExpected) drained entries, got \(drainedEntries.count)")
 
         // Assert zero data corruption across drained entries
         for entry in drainedEntries {
-            #expect(entry.confidenceScore == 0.88)
-            #expect(entry.layerIndex >= 5 && entry.layerIndex <= 24)
-            #expect(entry.horizonIndex >= 1 && entry.horizonIndex <= 3)
-            #expect(entry.expertID < 60)
-            #expect(entry.padding == 0)
-            #expect((entry.reserved & 0xFFFFFFFF00000000) == 0x55AA55AA00000000)
+            #expect(entry.confidenceScore == 0.88, "Corrupted confidenceScore: \(entry.confidenceScore)")
+            #expect(entry.layerIndex >= 5 && entry.layerIndex <= 24, "Corrupted layerIndex: \(entry.layerIndex)")
+            #expect(entry.horizonIndex >= 1 && entry.horizonIndex <= 3, "Corrupted horizonIndex: \(entry.horizonIndex)")
+            #expect(entry.expertID < 60, "Corrupted expertID: \(entry.expertID)")
+            #expect(entry.padding == 0, "Corrupted padding: \(entry.padding)")
+            #expect((entry.reserved & 0xFFFFFFFF00000000) == 0x55AA55AA00000000, "Corrupted reserved field: \(entry.reserved)")
         }
 
         #expect(tracker.totalUpdates == totalExpected)
-        #expect(tracker.count > 0 && tracker.count <= 1200)
+        #expect(tracker.count > 0 && tracker.count <= 1200, "Tracker count should be within valid bounds for deep layers x experts")
         #expect(tracker.lruExpert != nil)
     }
 
@@ -718,3 +931,4 @@ struct ExecutionLogTests {
         #expect(!MemoryBudgetConfig.isSectorAligned(bytes: 1001))
     }
 }
+```

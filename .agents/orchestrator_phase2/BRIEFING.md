@@ -27,13 +27,13 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 - **Work items**:
   1. Survey & Architecture Specification [done]
   2. M1: Fast I/O Engine & Dual-Queue Subsystem [done]
-  3. M2: Ring Buffer & Isolated Fallback Buffer Pools [in-progress]
-  4. M3: GPU Execution Log & Dispatch-Time LRU Tracking [pending]
+  3. M2: Ring Buffer & Isolated Fallback Buffer Pools [done]
+  4. M3: GPU Execution Log & Dispatch-Time LRU Tracking [in-progress]
   5. M4: ICB Native Conditional Execution & Cascading Abort [pending]
   6. M5: MLX Cache Limiting & Background Recalibration [pending]
   7. M6: Full Pipeline Integration & E2E Acceptance [pending]
-- **Current phase**: 2 (Milestone 2 Worker Implementation via Successor)
-- **Current focus**: Self-succession to Generation 2 Orchestrator to dispatch M2 Worker.
+- **Current phase**: 3 (Milestone 3 Execution Log & Dispatch-Time LRU)
+- **Current focus**: Milestone 3 Exploration & Blueprint Authoring
 
 ## 🔒 Key Constraints
 - Pure orchestrator: DISPATCH-ONLY. NEVER write, modify, or create source code directly. NEVER run build/test commands. NEVER investigate code directly. Only write metadata (.md) in own .agents/ folder.
@@ -73,16 +73,20 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 | explorer_m2_3 | teamwork_preview_explorer | M2 Deadlock & Test Harness | done | ea831424-3a8f-4a46-9adf-4cc89259de63 |
 | worker_m2_1 | teamwork_preview_worker | M2 Buffer Pools Implementation | failed (quota 429) | 9fac9324-0c5d-489b-9691-e32843592a89 |
 | worker_m2_2 | teamwork_preview_worker | M2 Buffer Pools Replacement | done | 1b72266f-5069-40b0-865c-996b9370585d |
-| reviewer_m2_1 | teamwork_preview_reviewer | M2 Conformance Review | in-progress | c1213707-d1b1-44d6-b48e-4f5cda77bd73 |
-| reviewer_m2_2 | teamwork_preview_reviewer | M2 Memory & Concurrency Review | in-progress | 264c65ae-37ba-451a-9557-412ddb8569df |
-| challenger_m2_1 | teamwork_preview_challenger | M2 Deadlock & Signal Challenger | in-progress | 3439b9bb-6f8e-4cc0-9a6f-0ccee645695e |
-| challenger_m2_2 | teamwork_preview_challenger | M2 500MB Ceiling Challenger | in-progress | 7a21cc32-564c-4c4b-ae82-088358f73d6a |
-| auditor_m2_1 | teamwork_preview_auditor | M2 Forensic Integrity Audit | in-progress | 6c473324-187b-46ef-8988-13d9a6c32e12 |
+| reviewer_m2_1 | teamwork_preview_reviewer | M2 Conformance Review | done | c1213707-d1b1-44d6-b48e-4f5cda77bd73 |
+| reviewer_m2_2 | teamwork_preview_reviewer | M2 Memory & Concurrency Review | done | 264c65ae-37ba-451a-9557-412ddb8569df |
+| challenger_m2_1 | teamwork_preview_challenger | M2 Deadlock & Signal Challenger | done | 3439b9bb-6f8e-4cc0-9a6f-0ccee645695e |
+| challenger_m2_2 | teamwork_preview_challenger | M2 500MB Ceiling Challenger | done | 7a21cc32-564c-4c4b-ae82-088358f73d6a |
+| auditor_m2_1 | teamwork_preview_auditor | M2 Forensic Integrity Audit | done | 6c473324-187b-46ef-8988-13d9a6c32e12 |
+| explorer_m3_1 | teamwork_preview_explorer | M3 Execution Log Architecture | done | 02352475-b372-491b-94b7-7a6d151ae5e8 |
+| spec_miner_m3_2 | teamwork_preview_spec_miner | M3 CPU Drain & LRU Specs | done | e3b1347e-9784-446b-af63-44df843acbe2 |
+| explorer_m3_3 | teamwork_preview_explorer | M3 Test Harness & Synthetic Kernels | done | 0c8809d4-bb8e-4c6e-ad0f-b3c85d788d15 |
+| worker_m3_1 | teamwork_preview_worker | M3 Execution Log & LRU Implementation | in-progress | 0c0c087a-21ae-434e-af81-f91c7e6d867f |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 7 / 16
-- Pending subagents: reviewer_m2_1, reviewer_m2_2, challenger_m2_1, challenger_m2_2, auditor_m2_1
+- Spawn count: 11 / 16
+- Pending subagents: worker_m3_1
 - Predecessor: Gen 1 (913b8328-6b64-4881-a075-c0057bc23d84)
 - Successor: not yet spawned
 

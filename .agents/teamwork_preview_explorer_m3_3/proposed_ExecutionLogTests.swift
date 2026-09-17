@@ -10,7 +10,6 @@
 import Testing
 import Metal
 import Foundation
-import os
 @testable import AsyncMoERouter
 
 /// Synthetic MSL shader sources for Milestone 3 runtime execution and stress tests.
@@ -482,7 +481,7 @@ struct ExecutionLogTests {
     // MARK: - 5. Concurrent GPU Write & CPU Drain Stress Testing
 
     @Test("Concurrent GPU parallel writes and CPU drain stress testing with zero data corruption")
-    func testConcurrentLogWriteAndDrain() async throws {
+    func testConcurrentLogWriteAndDrain() throws {
         let ctx = MetalContext.shared
         let pipeline = try ctx.makeComputePipelineState(
             source: SyntheticExecutionLogShaders.parallelLogWriterSource,
@@ -497,10 +496,15 @@ struct ExecutionLogTests {
         let batchSize = 64
         let totalExpected = numBatches * batchSize
 
-        let stateLock = OSAllocatedUnfairLock(initialState: (drained: [ExecutionLogEntry](), finished: false))
+        var drainedEntries: [ExecutionLogEntry] = []
+        let drainLock = NSLock()
+        let group = DispatchGroup()
+        let syncLock = NSLock()
+        var gpuFinished = false
 
         // Background GPU Dispatch Worker
-        let gpuTask = Task.detached(priority: .userInitiated) {
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
             for b in 0..<numBatches {
                 var startToken = UInt32(b * batchSize)
                 var baseTime = UInt64(b * 10_000 + 100)
@@ -525,63 +529,71 @@ struct ExecutionLogTests {
                 cmdBuf.commit()
                 cmdBuf.waitUntilCompleted()
 
-                try? await Task.sleep(nanoseconds: 150_000) // 150 us
+                usleep(150)
             }
 
-            stateLock.withLock { $0.finished = true }
+            syncLock.lock()
+            gpuFinished = true
+            syncLock.unlock()
+            group.leave()
         }
 
         // Concurrent CPU Drain Worker
-        let cpuTask = Task.detached(priority: .medium) {
+        group.enter()
+        DispatchQueue.global(qos: .default).async {
             while true {
                 let batch = log.drain()
                 if !batch.isEmpty {
-                    stateLock.withLock { $0.drained.append(contentsOf: batch) }
+                    drainLock.lock()
+                    drainedEntries.append(contentsOf: batch)
                     for e in batch {
                         let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
                         tracker.recordAccess(expert: key, timestamp: e.timestamp)
                     }
+                    drainLock.unlock()
                 }
 
-                let done = stateLock.withLock { $0.finished }
+                syncLock.lock()
+                let done = gpuFinished
+                syncLock.unlock()
                 if done { break }
-                try? await Task.sleep(nanoseconds: 100_000) // 100 us
+                usleep(100)
             }
 
             // Final drain sweeps to drain any residual entries
             for _ in 0..<5 {
                 let batch = log.drain()
                 if !batch.isEmpty {
-                    stateLock.withLock { $0.drained.append(contentsOf: batch) }
+                    drainLock.lock()
+                    drainedEntries.append(contentsOf: batch)
                     for e in batch {
                         let key = ExpertKey(layer: Int(e.layerIndex), expert: Int(e.expertID))
                         tracker.recordAccess(expert: key, timestamp: e.timestamp)
                     }
+                    drainLock.unlock()
                 }
-                try? await Task.sleep(nanoseconds: 50_000) // 50 us
+                usleep(50)
             }
+            group.leave()
         }
 
-        _ = await gpuTask.value
-        _ = await cpuTask.value
-
-        let drainedEntries = stateLock.withLock { $0.drained }
+        group.wait()
 
         // Assert all entries were drained with zero loss
-        #expect(drainedEntries.count == totalExpected)
+        #expect(drainedEntries.count == totalExpected, "Expected exactly \(totalExpected) drained entries, got \(drainedEntries.count)")
 
         // Assert zero data corruption across drained entries
         for entry in drainedEntries {
-            #expect(entry.confidenceScore == 0.88)
-            #expect(entry.layerIndex >= 5 && entry.layerIndex <= 24)
-            #expect(entry.horizonIndex >= 1 && entry.horizonIndex <= 3)
-            #expect(entry.expertID < 60)
-            #expect(entry.padding == 0)
-            #expect((entry.reserved & 0xFFFFFFFF00000000) == 0x55AA55AA00000000)
+            #expect(entry.confidenceScore == 0.88, "Corrupted confidenceScore: \(entry.confidenceScore)")
+            #expect(entry.layerIndex >= 5 && entry.layerIndex <= 24, "Corrupted layerIndex: \(entry.layerIndex)")
+            #expect(entry.horizonIndex >= 1 && entry.horizonIndex <= 3, "Corrupted horizonIndex: \(entry.horizonIndex)")
+            #expect(entry.expertID < 60, "Corrupted expertID: \(entry.expertID)")
+            #expect(entry.padding == 0, "Corrupted padding: \(entry.padding)")
+            #expect((entry.reserved & 0xFFFFFFFF00000000) == 0x55AA55AA00000000, "Corrupted reserved field: \(entry.reserved)")
         }
 
         #expect(tracker.totalUpdates == totalExpected)
-        #expect(tracker.count > 0 && tracker.count <= 1200)
+        #expect(tracker.count > 0 && tracker.count <= 1200, "Tracker count should be within valid bounds for deep layers x experts")
         #expect(tracker.lruExpert != nil)
     }
 
