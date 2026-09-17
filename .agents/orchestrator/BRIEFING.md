@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-17T07:31:50Z
+# BRIEFING — 2026-09-17T07:40:10Z
 
 ## Mission
 Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router according to the requirements and acceptance criteria in ORIGINAL_REQUEST.md.
@@ -22,14 +22,14 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 - **Work items**:
   1. Survey phase (3 parallel Explorers) [done]
   2. Architecture & Decomposition into PROJECT.md [done]
-  3. E2E Testing Track (TEST_INFRA.md, Tiers 1-4 tests, TEST_READY.md) [in-progress]
-  4. Milestone 1: Data Partitioning & Generation (Explorers -> Worker -> Reviewers -> Challengers -> Auditor) [in-progress]
+  3. E2E Testing Track (TEST_INFRA.md, Tiers 1-4 tests, TEST_READY.md) [done]
+  4. Milestone 1: Data Partitioning & Generation (Worker -> Reviewers -> Challengers -> Auditor) [in-progress]
   5. Milestone 2: Speculative Head Architecture & MMCE Training [pending]
   6. Milestone 3: Grid-Based Temperature Scaling with NLL & LBFGS [pending]
   7. Milestone 4: Targeted Gating & Pipeline Integration [pending]
   8. Milestone Final: 100% E2E Test Pass + Adversarial Coverage Hardening [pending]
-- **Current phase**: 2 (Dual Track Execution)
-- **Current focus**: E2E Test Suite Creation & Milestone 1 Exploration
+- **Current phase**: 2 (Milestone 1 Implementation)
+- **Current focus**: Worker implementing `src/config.py` and `src/data/` modules
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -45,10 +45,10 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 - Updated: 2026-09-17T07:23:45Z
 
 ## Key Decisions Made
-- Selected Project Pattern with Dual Track (Implementation Track + E2E Testing Track).
-- Survey completed: 18 features inventoried, base model properties confirmed (24 layers, 60 experts, top-4, d=2048, Layer 3 tap).
-- MPS compatibility rule enforced: PyTorch 2.2.2 requires `torch.float16` on MPS (no bfloat16).
-- M1 decomposed across Model Loader, Zero-OOM Stream Extractor, and Isolated Dataset persistence.
+- Selected Project Pattern with Dual Track.
+- TEST_READY.md published by E2E Testing Track (184 test cases across Tiers 1-4).
+- M1 Explorers delivered complete blueprints for model loading, zero-OOM streaming, and safetensors dataset partitioning.
+- Dispatched M1 Worker with exclusive write ownership on `src/config.py` and `src/data/`.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
@@ -56,15 +56,16 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 | spec_miner_survey_1 | teamwork_preview_spec_miner | Spec & Requirements Mining | completed | b18fd17b-2a84-48cf-b46e-1090970a40d5 |
 | explorer_survey_2 | teamwork_preview_explorer | Architecture & Runtime Environment | completed | 405d20f7-cb26-4f54-9ca2-8a7a77b76479 |
 | explorer_survey_3 | teamwork_preview_explorer | Calibration Math & Speculative Head | completed | 8e9e9415-b394-4ec2-a973-3677ee9a5f62 |
-| test_writer_e2e_1 | teamwork_preview_test_writer | E2E Testing Track (TEST_INFRA.md + tests/ T1-T4) | in-progress | ec0c2a23-7984-40b9-b5e8-995c1e5603b3 |
-| explorer_m1_1 | teamwork_preview_explorer | M1 Model Loader & Config Blueprint | in-progress | 8360620f-e750-41b4-ac7d-47e86f6cfdec |
-| explorer_m1_2 | teamwork_preview_explorer | M1 Zero-OOM Stream Extractor Blueprint | in-progress | f8de8a8c-050f-4999-b392-c524b49362a1 |
-| explorer_m1_3 | teamwork_preview_explorer | M1 Dataset Splitting & Alignment Blueprint | in-progress | e162ef45-9090-4c33-afac-5b3da9dd79a2 |
+| test_writer_e2e_1 | teamwork_preview_test_writer | E2E Testing Track (TEST_INFRA.md + tests/ T1-T4) | completed | ec0c2a23-7984-40b9-b5e8-995c1e5603b3 |
+| explorer_m1_1 | teamwork_preview_explorer | M1 Model Loader & Config Blueprint | completed | 8360620f-e750-41b4-ac7d-47e86f6cfdec |
+| explorer_m1_2 | teamwork_preview_explorer | M1 Zero-OOM Stream Extractor Blueprint | completed | f8de8a8c-050f-4999-b392-c524b49362a1 |
+| explorer_m1_3 | teamwork_preview_explorer | M1 Dataset Splitting & Alignment Blueprint | completed | e162ef45-9090-4c33-afac-5b3da9dd79a2 |
+| worker_m1_1 | teamwork_preview_worker | M1 Implementation (src/config.py, src/data/) | in-progress | 4e0cdfc4-5678-4e49-8496-f6eab4ac8b2e |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 7 / 16
-- Pending subagents: ec0c2a23-7984-40b9-b5e8-995c1e5603b3, 8360620f-e750-41b4-ac7d-47e86f6cfdec, f8de8a8c-050f-4999-b392-c524b49362a1, e162ef45-9090-4c33-afac-5b3da9dd79a2
+- Spawn count: 8 / 16
+- Pending subagents: 4e0cdfc4-5678-4e49-8496-f6eab4ac8b2e
 - Predecessor: none
 - Successor: not yet spawned
 
@@ -75,6 +76,8 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 ## Artifact Index
 - /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md — Authoritative user requirements
 - /Users/jack/Downloads/rlcd-router/PROJECT.md — Master Architecture, Feature Inventory & Milestones
+- /Users/jack/Downloads/rlcd-router/TEST_INFRA.md — Test Philosophy, Methodology & Feature Mapping
+- /Users/jack/Downloads/rlcd-router/TEST_READY.md — E2E Test Suite Ready Signal (184 test cases)
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/DISPATCH.md — Log of dispatch messages
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/BRIEFING.md — Working memory & state
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/progress.md — Progress & liveness tracking
