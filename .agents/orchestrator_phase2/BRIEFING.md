@@ -72,12 +72,17 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 | spec_miner_m2_2 | teamwork_preview_spec_miner | M2 500MB Fallback Pool Specs | done | ead44f36-81b1-432e-9dc5-42063b58384b |
 | explorer_m2_3 | teamwork_preview_explorer | M2 Deadlock & Test Harness | done | ea831424-3a8f-4a46-9adf-4cc89259de63 |
 | worker_m2_1 | teamwork_preview_worker | M2 Buffer Pools Implementation | failed (quota 429) | 9fac9324-0c5d-489b-9691-e32843592a89 |
-| worker_m2_2 | teamwork_preview_worker | M2 Buffer Pools Replacement | in-progress | 1b72266f-5069-40b0-865c-996b9370585d |
+| worker_m2_2 | teamwork_preview_worker | M2 Buffer Pools Replacement | done | 1b72266f-5069-40b0-865c-996b9370585d |
+| reviewer_m2_1 | teamwork_preview_reviewer | M2 Conformance Review | in-progress | c1213707-d1b1-44d6-b48e-4f5cda77bd73 |
+| reviewer_m2_2 | teamwork_preview_reviewer | M2 Memory & Concurrency Review | in-progress | 264c65ae-37ba-451a-9557-412ddb8569df |
+| challenger_m2_1 | teamwork_preview_challenger | M2 Deadlock & Signal Challenger | in-progress | 3439b9bb-6f8e-4cc0-9a6f-0ccee645695e |
+| challenger_m2_2 | teamwork_preview_challenger | M2 500MB Ceiling Challenger | in-progress | 7a21cc32-564c-4c4b-ae82-088358f73d6a |
+| auditor_m2_1 | teamwork_preview_auditor | M2 Forensic Integrity Audit | in-progress | 6c473324-187b-46ef-8988-13d9a6c32e12 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 2 / 16
-- Pending subagents: worker_m2_2
+- Spawn count: 7 / 16
+- Pending subagents: reviewer_m2_1, reviewer_m2_2, challenger_m2_1, challenger_m2_2, auditor_m2_1
 - Predecessor: Gen 1 (913b8328-6b64-4881-a075-c0057bc23d84)
 - Successor: not yet spawned
 

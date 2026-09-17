@@ -26,3 +26,17 @@
 
 Gate Result: **PASS**
 Milestone 1 satisfies all requirements of R1 (Fast I/O dual queues, MTLIOFileHandle DMA block reads, and MTLSharedEvent zero-CPU hardware synchronization).
+
+---
+
+### Gate — Milestone 2 (Ring Buffer Pool & Fallback Pool)
+| Agent | Role | Verdict | Source |
+|-------|------|---------|--------|
+| worker_m2_2 | teamwork_preview_worker | DONE (Build & 13 tests pass, commit 6f0f198) | handoff.md |
+| reviewer_m2_1 | teamwork_preview_reviewer | APPROVE (Conformance, state machine, R2 specs) | handoff.md |
+| reviewer_m2_2 | teamwork_preview_reviewer | APPROVE (Concurrency, memory budget, 0 leaks) | handoff.md |
+| challenger_m2_1 | teamwork_preview_challenger | PENDING | in-progress |
+| challenger_m2_2 | teamwork_preview_challenger | PENDING | in-progress |
+| auditor_m2_1 | teamwork_preview_auditor | PENDING | in-progress |
+
+Gate Result: **IN_EVALUATION**
