@@ -1,48 +1,52 @@
-# BRIEFING — 2026-09-17T07:31:00Z
+# BRIEFING — 2026-09-17T12:35:00Z
 
 ## Mission
-Investigate local environment, Qwen1.5-MoE-A2.7B architecture, streaming/memory management for 100k tokens, and clean 15-20% train/calibration split.
+Conduct an exhaustive technical survey and architectural specification for Requirements R1 and R2 of Phase 2 (Metal 3 Fast I/O Dual-Queue Setup, Ring Buffer Pool, Fallback Pool, and Cache-Miss Deadlock Resolution).
 
 ## 🔒 My Identity
 - Archetype: explorer
 - Roles: investigation, synthesis
 - Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2
-- Original parent: ce5bc762-f633-465c-9133-7ec43d0b5719
-- Milestone: Phase 1 Preview / Discovery Survey 2
+- Original parent: 913b8328-6b64-4881-a075-c0057bc23d84
+- Milestone: Phase 2 Survey & Architecture Specification
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement production or test code files
-- Write outputs to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2/analysis.md and handoff.md
-- Maintain progress.md as heartbeat
-- Send completion message to parent (ce5bc762-f633-465c-9133-7ec43d0b5719)
+- Read-only investigation — do NOT modify production code or tests directly
+- Adhere strictly to R1 and R2 requirements from ORIGINAL_REQUEST.md
+- Ensure conservative memory footprint: Ring Buffer and Fallback Pool sizing must not trigger memory pressure or heavy swapping
+- Communicate findings via handoff.md and send_message to caller (913b8328-6b64-4881-a075-c0057bc23d84)
 
 ## Current Parent
-- Conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719
-- Updated: 2026-09-17T07:24:32Z
+- Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
+- Updated: 2026-09-17T12:35:00Z
 
 ## Investigation State
 - **Explored paths**:
-  - Hardware & Host Environment: macOS Apple Silicon, 14 cores, 36 GB RAM (~13 GB avail), 187 GB free disk
-  - ML Stack: PyTorch 2.2.2, Transformers 4.44.0, Safetensors 0.6.2, Datasets 2.16.0, Pytest 8.3.4, Scikit-learn 1.3.2, Scipy 1.14.1
-  - Qwen/Qwen1.5-MoE-A2.7B: config.json, Qwen2MoeSparseMoeBlock forward, router logits tensors, shared expert gate, top-4 routing
-  - Token Streaming: Wikitext-2 (2M words), Qwen tokenizer (151k vocab), batch sizing (B=1, L=1024), 98 sequences
-  - Memory Management: Zero-OOM streaming protocol, torch.inference_mode(), use_cache=False, immediate .detach().cpu(), safetensors/memmap
-  - Data Partitioning: 80% train / 20% calib sequence-level split, lookahead horizon trimming (T+1..T+3)
+  - Metal 3 Fast I/O Dual-Queue setup (`MTLIOCommandQueueDescriptor`, priorities, buffer count).
+  - `MTLIOFileHandle` explicit block reads (`loadBytes` / `loadBuffer`) and alignment rules.
+  - Zero-CPU GPU-IO synchronization via `MTLSharedEvent`.
+  - Speculative Ring Buffer Pool sizing (16 slots = 276.8 MB) and lifecycle state transitions.
+  - Strictly isolated 500MB Fallback Buffer Pool (holding up to 30 expert buffers).
+  - Cache-miss deadlock resolution protocol, dirty slot abandonment, and signal dropping.
+  - Empirical verification script covering all R1 and R2 requirements.
 - **Key findings**:
-  - `torch.bfloat16` fails on Apple Silicon MPS in PyTorch 2.2.2; must use `torch.float16` on MPS.
-  - Model weights total 26.67 GB in FP16 (14.3B params total, 2.7B active). Automated testing must use synthetic `Qwen2MoeConfig`.
-  - Layer N tap: Layer 3 (1-indexed; index 2) recommended for optimal representation and ~20ms async lead time before Layer 5.
-  - Extracted 100k-token dataset is compact (~736 MB FP16 / ~1.43 GB FP32) and fits easily in RAM/disk once generated.
-- **Unexplored areas**: None for survey 2 scope. All 4 target areas thoroughly investigated and verified.
+  - `MTLIOPriorityLow` on `speculativeQueue` with `maxCommandBufferCount = 16` opportunistically prefetches weights without starving high-priority demands.
+  - `MTLIOPriorityHigh` on `fallbackQueue` preempts background I/O in the Apple Silicon storage controller.
+  - Each FP16 expert is exactly 17,301,504 bytes ($1056 \times 16,384$), perfectly page-aligned to 16KB on Apple Silicon.
+  - Zero-CPU synchronization via `MTLSharedEvent` works flawlessly: compute commands wait on hardware events without waking the host CPU.
+  - On a cache miss, marking the speculative slot as `.abandoned` and dropping the signal in `addCompletedHandler` cleanly avoids memory corruption and circular deadlocks.
+  - Total dedicated Metal buffers for Ring Buffer (276.8MB) + Fallback Pool (500MB) = 776.8MB, leaving >8–10 GB of untouched RAM on the 36GB host.
+- **Unexplored areas**: None for R1 and R2 scope. Requirements R1 and R2 are fully surveyed, specified, and verified.
 
 ## Key Decisions Made
-- Recommended Layer 3 (1-indexed) as default tap layer, configurable via CLI `--tap-layer 3`.
-- Mandated sequence-level 80/20 data partitioning with trailing 3-token horizon trimming to prevent leakage.
-- Selected `safetensors` / `np.memmap` for streaming persistence.
+- Specified a fixed 16-slot Ring Buffer (276.8MB FP16) pre-allocated in `.storageModeShared`.
+- Formulated the 500MB Fallback Buffer Pool as strictly isolated, non-borrowable, holding up to 30 expert buffers.
+- Defined the complete cache-miss deadlock resolution protocol with dirty slot marking, cooperative `tryCancel()`, and signal dropping on completion.
+- Formulated production Swift structures using `OSAllocatedUnfairLock` to prevent actor hopping overhead.
 
 ## Artifact Index
-- DISPATCH.md — task instructions and prompt record
-- BRIEFING.md — persistent state memory
-- progress.md — liveness heartbeat
-- analysis.md — comprehensive 7-section technical analysis report
-- handoff.md — self-contained 5-component handoff report
+- DISPATCH.md — Task assignment from Phase 2 orchestrator
+- BRIEFING.md — Persistent state memory
+- progress.md — Liveness heartbeat and milestone progress
+- analysis.md — Comprehensive technical analysis report
+- handoff.md — 5-component handoff report

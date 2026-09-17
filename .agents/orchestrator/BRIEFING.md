@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-17T07:40:10Z
+# BRIEFING — 2026-09-17T07:56:40Z
 
 ## Mission
 Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router according to the requirements and acceptance criteria in ORIGINAL_REQUEST.md.
@@ -23,13 +23,13 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
   1. Survey phase (3 parallel Explorers) [done]
   2. Architecture & Decomposition into PROJECT.md [done]
   3. E2E Testing Track (TEST_INFRA.md, Tiers 1-4 tests, TEST_READY.md) [done]
-  4. Milestone 1: Data Partitioning & Generation (Worker -> Reviewers -> Challengers -> Auditor) [in-progress]
+  4. Milestone 1: Data Partitioning & Generation (Iteration 1: FAIL -> Iteration 2: Remediation) [in-progress]
   5. Milestone 2: Speculative Head Architecture & MMCE Training [pending]
   6. Milestone 3: Grid-Based Temperature Scaling with NLL & LBFGS [pending]
   7. Milestone 4: Targeted Gating & Pipeline Integration [pending]
   8. Milestone Final: 100% E2E Test Pass + Adversarial Coverage Hardening [pending]
-- **Current phase**: 2 (Milestone 1 Implementation)
-- **Current focus**: Worker implementing `src/config.py` and `src/data/` modules
+- **Current phase**: 2 (Milestone 1 Remediation Iteration)
+- **Current focus**: 3 Explorers formulating fix blueprints for Reviewer 1 feedback
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -45,10 +45,9 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 - Updated: 2026-09-17T07:23:45Z
 
 ## Key Decisions Made
-- Selected Project Pattern with Dual Track.
-- TEST_READY.md published by E2E Testing Track (184 test cases across Tiers 1-4).
-- M1 Explorers delivered complete blueprints for model loading, zero-OOM streaming, and safetensors dataset partitioning.
-- Dispatched M1 Worker with exclusive write ownership on `src/config.py` and `src/data/`.
+- Iteration 1 Gate returned FAIL due to Reviewer 1 REQUEST_CHANGES (vocab_size mismatch in `stream_synthetic`, $N=2$ sequence partition edge case).
+- Dispatched 3 Explorers for Iteration 2 remediation design.
+- Spawn threshold reached: 16 / 16. Succession will execute as soon as pending subagents complete.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
@@ -60,12 +59,20 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 | explorer_m1_1 | teamwork_preview_explorer | M1 Model Loader & Config Blueprint | completed | 8360620f-e750-41b4-ac7d-47e86f6cfdec |
 | explorer_m1_2 | teamwork_preview_explorer | M1 Zero-OOM Stream Extractor Blueprint | completed | f8de8a8c-050f-4999-b392-c524b49362a1 |
 | explorer_m1_3 | teamwork_preview_explorer | M1 Dataset Splitting & Alignment Blueprint | completed | e162ef45-9090-4c33-afac-5b3da9dd79a2 |
-| worker_m1_1 | teamwork_preview_worker | M1 Implementation (src/config.py, src/data/) | in-progress | 4e0cdfc4-5678-4e49-8496-f6eab4ac8b2e |
+| worker_m1_1 | teamwork_preview_worker | M1 Implementation (src/config.py, src/data/) | completed | 4e0cdfc4-5678-4e49-8496-f6eab4ac8b2e |
+| reviewer_m1_1 | teamwork_preview_reviewer | M1 Objective Review & Test Execution | completed | b7730a1e-6e90-4a95-8fdc-f2b6ba1da70f |
+| reviewer_m1_2 | teamwork_preview_reviewer | M1 Adversarial Review & Data I/O | completed | 399163da-12fa-440c-b12a-5f0e986915d2 |
+| challenger_m1_1 | teamwork_preview_challenger | M1 Empirical Memory & Mask Stress Testing | completed | 3a0ba168-f799-41db-a219-bd3cba112177 |
+| challenger_m1_2 | teamwork_preview_challenger | M1 Partitioning & Gradient Isolation Testing | completed | cf1c8866-2d8d-472e-b072-6e4b7247c24c |
+| auditor_m1_1 | teamwork_preview_auditor | M1 Forensic Integrity Audit | completed | 65b37de7-a557-4dfc-9413-e4ef9f2c336a |
+| explorer_m1_it2_1 | teamwork_preview_explorer | M1 It2 Vocab Fix Blueprint | in-progress | 22116ea3-f469-46a3-8f68-d3c59542ba67 |
+| explorer_m1_it2_2 | teamwork_preview_explorer | M1 It2 Partition Fix Blueprint | in-progress | 36878654-6228-4e64-985e-2821c80ef04e |
+| explorer_m1_it2_3 | teamwork_preview_explorer | M1 It2 Pipeline Verification Blueprint | in-progress | f90aac7f-80d7-4f88-9de5-16b754f7e77d |
 
 ## Succession Status
-- Succession required: no
-- Spawn count: 8 / 16
-- Pending subagents: 4e0cdfc4-5678-4e49-8496-f6eab4ac8b2e
+- Succession required: yes (spawns reached 16; pending completion of 3 explorers)
+- Spawn count: 16 / 16
+- Pending subagents: 22116ea3-f469-46a3-8f68-d3c59542ba67, 36878654-6228-4e64-985e-2821c80ef04e, f90aac7f-80d7-4f88-9de5-16b754f7e77d
 - Predecessor: none
 - Successor: not yet spawned
 
@@ -81,3 +88,4 @@ Build the Phase 1 PyTorch ML Calibration scripts for an Asynchronous MoE Router 
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/DISPATCH.md — Log of dispatch messages
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/BRIEFING.md — Working memory & state
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator/progress.md — Progress & liveness tracking
+- /Users/jack/Downloads/rlcd-router/.agents/orchestrator/GATE_STATUS.md — Gate verdict tracking

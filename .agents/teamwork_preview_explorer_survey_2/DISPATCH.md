@@ -1,17 +1,51 @@
-# Explorer Survey Arch Task
+# DISPATCH: Survey Explorer 2 (Metal 3 Fast I/O, Queues, Buffer Pools - R1 & R2)
 
-You are teamwork_preview_explorer_survey_2.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2
 
-Your task:
-Investigate the runtime environment (Python version, PyTorch, Transformers, hardware acceleration MPS/CUDA/CPU, memory limitations), the Qwen/Qwen1.5-MoE-A2.7B model architecture (number of layers, number of experts, top-k gating, router logits structure, hidden state dimensions, Layer N selection), data streaming mechanics for a 100k-token corpus without OOM, and strictly isolated 15-20% held-out calibration split.
-Produce a comprehensive analysis.md and handoff.md in your working directory.
-Reference /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md.
+## Task Objective
+Conduct an exhaustive technical survey and architectural specification for Requirements R1 and R2 of Phase 2:
+1. Metal 3 Fast I/O Dual-Queue Setup (R1):
+   - `speculativeQueue`: `MTLIOCommandQueue` with `PriorityLow` and `maxCommandBufferCount: 16` for external NVMe prefetching.
+   - `fallbackQueue`: `MTLIOCommandQueue` with `PriorityHigh` for demand fetches on miss.
+   - `MTLIOFileHandle` for explicit block reads (`loadBytes` / `loadBuffer`).
+   - `MTLSharedEvent` for zero-CPU GPU-IO synchronization.
+2. Ring Buffer Pool & Fallback Pool (R2):
+   - Fixed array of `MTLBuffer`s for speculative Ring Buffer (size calculation, alignment, slot tracking).
+   - Strictly isolated 500MB Fallback Buffer Pool.
+   - Cache-miss deadlock resolution: allocate from Fallback Pool, dispatch to fallbackQueue, mark speculative slot as abandoned/dirty, drop signal when its IO callback fires.
+3. Determine exact Metal API signatures, Swift structures, error handling, synchronization invariants, and memory footprint management.
 
-## 2026-09-17T07:24:32Z
-Investigate the technical environment and model architecture:
-1. Local environment: Python version, PyTorch version, Transformers version, accelerate/datasets, available compute devices (MPS on Mac, CPU, CUDA if any), RAM constraints, and disk space.
-2. Qwen/Qwen1.5-MoE-A2.7B architecture: Inspect model configuration, total layers, hidden dimension (d_model), number of routed experts, top-k routed experts, shared experts (if any), routing mechanism (router logits, softmax vs sigmoid top-k, gating output tensors). Determine suitable Layer N for tap (e.g. intermediate layer such as layer 2, 3, or 4 prior to deep layers 5-24).
-3. Streaming & Memory management: How to stream 100k tokens through the model without OOM on Mac/local resources. Batch sizing, torch.no_grad, activation offloading/saving to disk (memmap / safetensors / zarr / torch save in chunks), memory leak prevention.
-4. Clean train/calibration split: 15-20% held-out strictly isolated split mechanics.
+## Authoritative Requirements Reference
+Read `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section) before starting work.
+
+## Deliverables
+Write your comprehensive investigation report to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2/handoff.md` and keep `progress.md` updated.
+When complete, notify orchestrator via `send_message`.
+
+## 2026-09-17T12:29:50Z
+<USER_REQUEST>
+You are Survey Explorer 2 for Phase 2: Swift/Metal Execution Pipeline.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+
+Task:
+Conduct an exhaustive technical survey and architectural specification for Requirements R1 and R2 of Phase 2:
+1. Metal 3 Fast I/O Dual-Queue Setup (R1):
+   - `speculativeQueue`: `MTLIOCommandQueue` with PriorityLow and maxCommandBufferCount 16 for external NVMe prefetching.
+   - `fallbackQueue`: `MTLIOCommandQueue` with PriorityHigh for demand fetches on miss.
+   - `MTLIOFileHandle` for explicit block reads (`loadBytes` / `loadBuffer`).
+   - `MTLSharedEvent` for zero-CPU GPU-IO synchronization.
+2. Ring Buffer Pool & Fallback Pool (R2):
+   - Fixed array of `MTLBuffer`s for speculative Ring Buffer (size calculation, alignment, slot tracking).
+   - Strictly isolated 500MB Fallback Buffer Pool.
+   - Cache-miss deadlock resolution: allocate from Fallback Pool, dispatch to fallbackQueue, mark speculative slot as abandoned/dirty, drop signal when its IO callback fires.
+3. Determine exact Metal API signatures, Swift structures, error handling, synchronization invariants, and memory footprint management.
+
+Deliverables:
+- Maintain progress.md in your working directory.
+- Write your comprehensive findings to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2/handoff.md following the Handoff Protocol.
+- When finished, send a message to orchestrator with your summary.
+</USER_REQUEST>
+

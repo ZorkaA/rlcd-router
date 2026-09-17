@@ -1,7 +1,7 @@
-# BRIEFING — 2026-09-17T07:37:30Z
+# BRIEFING — 2026-09-17T12:50:00Z
 
 ## Mission
-Investigate and design the exact technical specification and code blueprint for `src/data/model_loader.py` and `src/config.py` (device selection, FP16 MPS constraint, model loading, synthetic fixture).
+Design the concrete SwiftPM package structure and foundational code architecture for Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
 
 ## 🔒 My Identity
 - Archetype: teamwork_preview_explorer
@@ -9,6 +9,8 @@ Investigate and design the exact technical specification and code blueprint for 
 - Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1
 - Original parent: ce5bc762-f633-465c-9133-7ec43d0b5719
 - Milestone: M1 (Data Partitioning & Generation)
+- Phase 2 Parent: 913b8328-6b64-4881-a075-c0057bc23d84
+- Phase 2 Milestone: Phase 2 Milestone 1 (Fast I/O Engine & Dual-Queue Subsystem)
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement directly in src/
@@ -16,30 +18,51 @@ Investigate and design the exact technical specification and code blueprint for 
 - No bfloat16 on MPS (PyTorch 2.2.2 MPS crash workaround: use torch.float16)
 - Model forward pass must configure output_hidden_states=True, output_router_logits=True, use_cache=False
 - Zero-download synthetic model fixture required for testing and CI
+- [Phase 2] Read-only investigation — do NOT modify root Sources/ directly; provide concrete copy-pasteable blueprints in handoff.md and proposed files in own working directory
+- [Phase 2] SwiftPM test directory must be named `swift_tests/AsyncMoERouterTests` to avoid APFS case-insensitivity conflict with Python `tests/`
+- [Phase 2] Metal shaders must be compiled at runtime via `device.makeLibrary(source:options:)` (runtime MSL compilation) to eliminate dependency on missing offline CLI `metal` toolchain
+- [Phase 2] Target macOS 14.0+ / Swift 5.9+ / Metal 3
+- [Phase 2] Strict memory ceiling: overall pipeline dedicated memory constrained to ~1.22 GB max
 
 ## Current Parent
-- Conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719
-- Updated: 2026-09-17T07:37:30Z
+- Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
+- Updated: 2026-09-17T12:50:00Z
 
 ## Investigation State
-- **Explored paths**: ORIGINAL_REQUEST.md, PROJECT.md, survey_2 handoff, local HF cache, PyTorch 2.2.2 MPS runtime, Transformers Qwen2Moe architecture.
-- **Key findings**: 
-  1. MPS raises `TypeError: BFloat16 is not supported on MPS`. FP16 strictly enforced.
-  2. Base model config has `"torch_dtype": "bfloat16"`, so naive auto-loading crashes on MPS. Explicit override to `torch.float16` implemented.
-  3. `outputs.hidden_states` has length 25 (Layer 3 output is index 3). `outputs.router_logits` has length 24 (Deep layers 5..24 are indices 4..23, shape `(B*L, 60)`).
-  4. Created zero-download synthetic fixture `get_synthetic_model()` with $d=64$, 6 layers, 16 experts, top-4 (~1.56M params, <6 MB RAM, <0.06s init, <0.6s fwd).
-- **Unexplored areas**: None for M1.1 scope. Fully characterized.
+- **Explored paths**:
+  - `ORIGINAL_REQUEST.md`: Phase 2 R1 & R2 Fast I/O, ring buffer, fallback pool, zero-CPU sync.
+  - `.agents/orchestrator_phase2/PROJECT.md`: Milestones, feature inventory, M1 ↔ M2 contract.
+  - Survey 1 & 2 findings: Apple M3 Max, Swift 6.4, Metal 3 Fast I/O headers, priority queues.
+  - Empirical verification: verified runtime MSL compilation, dual Fast I/O queues, zero-CPU `MTLSharedEvent` hardware sync, 32-byte `ExecutionLogEntry`, and defensive bounds checks.
+- **Key findings**:
+  1. `MTLIOCommandQueueDescriptor` provides `priority = .low` (`speculativeQueue`) and `priority = .high` (`fallbackQueue`), with `maxCommandBufferCount = 16` and `type = .concurrent`.
+  2. `MTLIOStatus` enum in Swift uses `.complete` (not `.completed`).
+  3. `MTLIOCommandQueue` does not expose `.priority` as a runtime getter; priority must be tested via queue descriptor configuration.
+  4. FP16 expert weights for `Qwen1.5-MoE-A2.7B` are exactly 17,301,504 bytes (1056 x 16 KB pages), naturally page-aligned for direct NVMe DMA.
+  5. `ExecutionLogEntry` has exact stride 32 bytes and alignment 8.
+  6. Apple Silicon Metal 3 zero-CPU GPU-IO synchronization verified: `ioCmd.signalEvent` -> `computeCmd.encodeWaitForEvent` passes data with zero CPU polling or context switching.
+- **Unexplored areas**: None for Milestone 1 scope. Fully verified and tested.
 
 ## Key Decisions Made
-- `src/config.py`: Defined comprehensive constants table, device resolution helpers (`resolve_device`, `resolve_dtype`), and structured configuration dataclasses.
-- `src/data/model_loader.py`: Implemented `load_model`, `load_tokenizer`, `load_model_and_tokenizer`, `get_synthetic_model`, `get_synthetic_tokenizer`, `get_synthetic_model_and_tokenizer`.
-- Validated all functions and fixtures via automated test suite in working directory.
+- `Package.swift`: Designed SwiftPM manifest with custom paths `Sources/AsyncMoERouter` and `swift_tests/AsyncMoERouterTests`.
+- `Config.swift`: Implemented `MoEArchitectureConfig` with `.qwen15MoEA27B` and `.synthetic`, and `MemoryBudgetConfig` with alignment utilities.
+- `MetalContext.swift`: Implemented thread-safe runtime MSL compilation manager with `OSAllocatedUnfairLock` caching.
+- `Types.swift`: Implemented `ExpertKey`, `SlotState`, `RingBufferSlot`, `ExecutionLogEntry`, and `FastIOError`.
+- `FastIOEngine.swift`: Implemented `FastIOEngineProtocol` with `speculativeQueue` (PriorityLow, max 16) and `fallbackQueue` (PriorityHigh, max 16).
+- `WeightFileHandle.swift` & `SyncEvent.swift`: Implemented clean zero-copy wrappers for `MTLIOFileHandle` and `MTLSharedEvent`.
+- All 7 verification stages empirically validated.
 
 ## Artifact Index
-- DISPATCH.md — Task log from orchestrator
-- BRIEFING.md — Working memory
-- progress.md — Liveness heartbeat
-- analysis.md — Technical specification & blueprint
-- handoff.md — 5-component hard handoff report
-- proposed_config.py — Machine-applicable proposed implementation for src/config.py
-- proposed_model_loader.py — Machine-applicable proposed implementation for src/data/model_loader.py
+- `DISPATCH.md` — Task log and status updates from orchestrator
+- `BRIEFING.md` — Working memory and situational awareness
+- `progress.md` — Liveness heartbeat and completed steps
+- `proposed_Package.swift` — Blueprint for Package.swift
+- `proposed_Config.swift` — Blueprint for Sources/AsyncMoERouter/Common/Config.swift
+- `proposed_MetalContext.swift` — Blueprint for Sources/AsyncMoERouter/Common/MetalContext.swift
+- `proposed_Types.swift` — Blueprint for Sources/AsyncMoERouter/Common/Types.swift
+- `proposed_FastIOEngine.swift` — Blueprint for Sources/AsyncMoERouter/FastIO/FastIOEngine.swift
+- `proposed_WeightFileHandle.swift` — Blueprint for Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift
+- `proposed_SyncEvent.swift` — Blueprint for Sources/AsyncMoERouter/FastIO/SyncEvent.swift
+- `proposed_TestHelpers.swift` — Blueprint for swift_tests/AsyncMoERouterTests/Common/TestHelpers.swift
+- `proposed_FastIOTests.swift` — Blueprint for swift_tests/AsyncMoERouterTests/Unit/FastIOTests.swift
+- `handoff.md` — 5-component hard handoff report with copy-pasteable code blueprints

@@ -340,7 +340,7 @@ def test_f07_valid_mask_loss_filtering():
 def test_f07_loss_module_contract():
     """F7.4: Verify src.training.mmce_loss or losses module contract."""
     loss_mod = safe_import("src.training.mmce_loss")
-    assert hasattr(loss_mod, "MultiHorizonCrossEntropyLoss") or hasattr(loss_mod, "compute_loss")
+    assert hasattr(loss_mod, "CombinedCalibrationLoss") or hasattr(loss_mod, "soft_cross_entropy_loss")
 
 
 def test_f07_zero_loss_at_identical_distributions():
@@ -407,7 +407,7 @@ def test_f08_tunable_lambda_scaling(oracles):
 def test_f08_mmce_module_contract():
     """F8.5: Verify src.training.mmce_loss.compute_mmce contract."""
     loss_mod = safe_import("src.training.mmce_loss")
-    assert hasattr(loss_mod, "compute_mmce") or hasattr(loss_mod, "MMCELoss")
+    assert hasattr(loss_mod, "rkhs_mmce_penalty") or hasattr(loss_mod, "MMCELoss")
 
 
 # ===========================================================================
@@ -571,7 +571,7 @@ def test_f11_lbfgs_line_search_strong_wolfe():
 def test_f11_lbfgs_module_contract():
     """F11.5: Verify src.calibration.lbfgs_optimizer contract."""
     calib_mod = safe_import("src.calibration.lbfgs_optimizer")
-    assert hasattr(calib_mod, "fit_temperature_grid") or hasattr(calib_mod, "calibrate_grid")
+    assert hasattr(calib_mod, "LBFGSOptimizer") or hasattr(calib_mod, "calibrate_grid")
 
 
 # ===========================================================================
@@ -817,7 +817,7 @@ def test_f16_zero_tensor_leak_after_delete():
 def test_f16_memory_profiler_module_contract():
     """F16.4: Verify src.evaluation.memory_profiler contract."""
     prof_mod = safe_import("src.evaluation.memory_profiler")
-    assert hasattr(prof_mod, "MemoryLeakTracker") or hasattr(prof_mod, "ProfileSession")
+    assert hasattr(prof_mod, "MemoryProfiler") or hasattr(prof_mod, "ProfileSession")
 
 
 def test_f16_memory_leak_threshold_assertion():

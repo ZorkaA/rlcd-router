@@ -1,36 +1,52 @@
-# Milestone 1 Explorer 1: Model Loading & Environment Architecture
+# DISPATCH: M1 Explorer 1 (SwiftPM Setup & Code Architecture)
 
-You are teamwork_preview_explorer_m1_1.
-Working directory: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1
-Parent: orchestrator (ce5bc762-f633-465c-9133-7ec43d0b5719)
+## Assigned Working Directory
+/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1
 
-MANDATORY INPUT:
-- Read /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- Read /Users/jack/Downloads/rlcd-router/PROJECT.md
+## Task Objective
+Design the concrete SwiftPM package structure and foundational code architecture for Milestone 1: Fast I/O Engine & Dual-Queue Subsystem.
+Key areas:
+1. `Package.swift`: Configure targets (`AsyncMoERouter` at `Sources/AsyncMoERouter`, `AsyncMoERouterTests` at `swift_tests/AsyncMoERouterTests` to avoid APFS case-insensitivity conflict with `tests/`).
+2. Foundational types in `Sources/AsyncMoERouter/Common/`:
+   - `Config.swift`: MoE model dimensions ($d=2048$, 60 experts, 4 active, 20 deep layers, expert weight sizing: 17.3MB FP16 / 24KB synthetic test size), memory limits.
+   - `MetalContext.swift`: `MTLDevice`, standard `MTLCommandQueue`, runtime MSL compilation manager via `device.makeLibrary(source:options:)`.
+   - `Types.swift`: Data structures, buffer slot state enums.
+3. Fast I/O queue setup in `Sources/AsyncMoERouter/FastIO/FastIOEngine.swift`:
+   - `speculativeQueue`: `MTLIOCommandQueue` with `priority = .low`, `maxCommandBufferCount = 16`, `type = .concurrent`.
+   - `fallbackQueue`: `MTLIOCommandQueue` with `priority = .high`, `maxCommandBufferCount = 16`, `type = .concurrent`.
+4. Provide precise, copy-pasteable implementation blueprints for the Worker.
 
-YOUR ROLE & OBJECTIVE:
-Investigate and design the exact technical specification and code blueprint for `src/data/model_loader.py` and `src/config.py`:
-1. Model loading for `Qwen/Qwen1.5-MoE-A2.7B`:
-   - Device handling: Automatic detection of MPS vs CPU. Critical finding from Survey 2: PyTorch 2.2.2 on MPS crashes on `bfloat16` (`RuntimeError: BFloat16 is not supported on MPS`). Therefore on MPS, dtype MUST be `torch.float16`. On CPU, `torch.bfloat16` or `torch.float32`.
-   - Forward pass configuration: `output_hidden_states=True`, `output_router_logits=True`, `use_cache=False`.
-2. Fast Synthetic Model Fixture:
-   - Provide a zero-download synthetic `Qwen2MoeForCausalLM` factory (`get_synthetic_model()`) using a scaled-down `Qwen2MoeConfig` ($d=64$, 6 layers, 16 experts, top_k=4) with exact output structure matching the genuine model for unit testing and CI.
-3. Design clear function signatures, class definitions, and error handling.
-Write `analysis.md` and `handoff.md` in your working directory.
+## Authoritative References
+- Requirements: `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md` (Phase 2 section)
+- Architecture & Inventory: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`
+- Survey 1 findings: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_1/handoff.md`
+- Survey 2 findings: `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_survey_2/handoff.md`
 
-## 2026-09-17T07:31:42Z
-You are teamwork_preview_explorer_m1_1.
-Your working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1
-Your parent is orchestrator (conversation ID: ce5bc762-f633-465c-9133-7ec43d0b5719).
+## Deliverables
+- Keep `progress.md` updated.
+- Write your comprehensive technical plan to `/Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1/handoff.md`.
+- Notify orchestrator via `send_message` when complete.
 
-MANDATORY INPUT:
-- Read /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
-- Read /Users/jack/Downloads/rlcd-router/PROJECT.md
-- Read /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1/DISPATCH.md
+## 2026-09-17T12:39:22Z
+You are M1 Explorer 1 for Phase 2: Swift/Metal Execution Pipeline.
+Your assigned working directory is: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1
+Read your dispatch assignment at: /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1/DISPATCH.md
+Read the authoritative user requirements at: /Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+Read Phase 2 architecture at: /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md
 
-YOUR ROLE & OBJECTIVE:
-Investigate and design the exact technical specification and code blueprint for `src/data/model_loader.py` and `src/config.py`:
-- Device selection (MPS vs CPU), float16 constraint on MPS (preventing BFloat16 crash).
-- Model loading mechanics with `output_hidden_states=True`, `output_router_logits=True`, `use_cache=False`.
-- Synthetic model fixture for fast testing (`get_synthetic_model`).
-Write analysis.md and handoff.md in your working directory, and notify parent.
+Task:
+Design the concrete SwiftPM package structure and foundational code architecture for Milestone 1 (Fast I/O Engine & Dual-Queue Subsystem):
+1. Package.swift layout (Sources/AsyncMoERouter and swift_tests/AsyncMoERouterTests).
+2. Foundational Common types (Config.swift with MoE dimensions, MetalContext.swift with runtime MSL compilation, Types.swift).
+3. FastIOEngine.swift with speculativeQueue (PriorityLow, max 16) and fallbackQueue (PriorityHigh).
+Provide detailed code blueprints for the Worker in your handoff report.
+
+Deliverables:
+- Maintain progress.md.
+- Write your comprehensive report to /Users/jack/Downloads/rlcd-router/.agents/teamwork_preview_explorer_m1_1/handoff.md following the Handoff Protocol.
+- Send message to orchestrator when complete.
+
+## 2026-09-17T12:46:19Z
+**Context**: Phase 2 Milestone 1 SwiftPM Architecture
+**Content**: Status check. Please report your current progress on Phase 2 Milestone 1: Package.swift layout, Common/Config.swift, Common/MetalContext.swift, and FastIOEngine.swift. Note that your working directory contained old Phase 1 files; your current task is Phase 2 Swift/Metal pipeline as detailed in your DISPATCH.md.
+**Action**: If completed, deliver your Phase 2 handoff.md and reply with your summary. If working, report current status.
