@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-17T16:50:45Z
+# BRIEFING — 2026-09-17T17:01:00Z
 
 ## Mission
 Adversarially challenge Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem focusing on memory leak stress (200+ loads, 0-byte RAM growth), defensive bounds protection, and multi-slot out-of-order SyncEvent safety.
@@ -20,28 +20,44 @@ Adversarially challenge Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsys
 
 ## Current Parent
 - Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
-- Updated: 2026-09-17T16:50:45Z
+- Updated: 2026-09-17T17:01:00Z
 
 ## Review Scope
-- **Files to review**: `Sources/AsyncMoERouter/FastIO/FastIOEngine.swift`, `Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift`, `Sources/AsyncMoERouter/FastIO/SyncEvent.swift`, `Sources/AsyncMoERouter/Common/Config.swift`, `Sources/AsyncMoERouter/Common/MetalContext.swift`, `Sources/AsyncMoERouter/Common/Types.swift`
+- **Files reviewed**:
+  - `Sources/AsyncMoERouter/FastIO/FastIOEngine.swift`
+  - `Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift`
+  - `Sources/AsyncMoERouter/FastIO/SyncEvent.swift`
+  - `Sources/AsyncMoERouter/Common/Config.swift`
+  - `Sources/AsyncMoERouter/Common/MetalContext.swift`
+  - `Sources/AsyncMoERouter/Common/Types.swift`
 - **Interface contracts**: `/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md`, `/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md`
-- **Review criteria**: 200+ repeated loads memory leak stress (0 bytes RAM growth), defensive bounds traps, multi-slot out-of-order safety
+- **Review criteria**:
+  1. 200+ repeated loads memory leak stress (0 bytes RAM growth).
+  2. Defensive bounds traps (EOF, buffer overflow, invalid layer/expert index).
+  3. Multi-slot out-of-order SyncEvent safety.
 
 ## Key Decisions Made
-- Designing `FastIOChallenger2StressTests.swift` in `swift_tests/AsyncMoERouterTests/Unit/` to empirically test all 3 requirements without altering production code.
+- Authored 10 comprehensive adversarial stress tests in `swift_tests/AsyncMoERouterTests/Unit/FastIOChallenger2StressTests.swift`.
+- Empirically verified 250 repeated DMA loads through `FastIOEngine` with negative memory footprint growth (-32 KB physical footprint delta, -16 KB resident memory delta).
+- Empirically verified 200 dynamic MTLBuffer allocation/deallocation cycles with 0 byte leak (-1.34 MB delta).
+- Empirically verified defensive bounds checking against 8 distinct out-of-bounds EOF access patterns, buffer overflows, closed handles, and invalid layer/expert indices.
+- Empirically verified 16-slot out-of-order completion safety: reversed DMA completion order (slot 15 down to 0) caused zero premature unblocking of pending GPU compute commands.
+- Empirically verified 10,000 concurrent ticket allocations across 100 threads with zero race conditions or collisions.
+- Verdict: **APPROVE**.
 
 ## Artifact Index
-- handoff.md — Final empirical handoff report
-- progress.md — Liveness heartbeat and milestone tracking
-- swift_tests/AsyncMoERouterTests/Unit/FastIOChallenger2StressTests.swift — Empirical challenge test suite
+- `handoff.md` — Final empirical handoff report
+- `progress.md` — Liveness heartbeat and milestone tracking
+- `swift_tests/AsyncMoERouterTests/Unit/FastIOChallenger2StressTests.swift` — 10-test adversarial memory leak & defensive bounds stress suite
 
 ## Attack Surface
 - **Hypotheses tested**:
-  1. Repeated Fast I/O loads leak system RAM or retain command buffer queue slots over 200+ iterations.
-  2. Out-of-bounds reads (reading past EOF, buffer overflow, invalid layer/expert index) could bypass `WeightFileHandle` checks and corrupt memory.
-  3. Multi-slot concurrent out-of-order ticket completions cause premature signaling or race conditions across slots.
-- **Vulnerabilities found**: TBD during test execution.
-- **Untested angles**: Hardware NVMe queue depth saturation beyond 16 commands simultaneously.
+  1. Repeated Fast I/O loads leak system RAM or retain command buffer queue slots over 200+ iterations -> Falsified. Memory growth is strictly <= 0 bytes.
+  2. Out-of-bounds reads (reading past EOF, buffer overflow, invalid layer/expert index) bypass checks -> Falsified. Strictly trapped before Metal I/O execution.
+  3. Multi-slot concurrent out-of-order ticket completions cause premature signaling or race conditions across slots -> Falsified. Dedicated SyncEvents guarantee slot isolation.
+  4. Ticket allocation race conditions under high concurrency -> Falsified. OSAllocatedUnfairLock guarantees unique atomic sequence.
+- **Vulnerabilities found**: None. System is resilient to memory leak stress, bounds corruption, and multi-threaded out-of-order completion.
+- **Untested angles**: Hardware-level physical NVMe drive pull during DMA transfer (unsupported in software virtual environment).
 
 ## Loaded Skills
 - None

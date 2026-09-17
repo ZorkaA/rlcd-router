@@ -1,12 +1,3 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the AsyncMoERouter open source project
-//
-// Copyright (c) 2026 Apple Inc. and the AsyncMoERouter project authors
-// Licensed under Apache License v2.0
-//
-//===----------------------------------------------------------------------===//
-
 import Foundation
 import Metal
 import os
@@ -20,8 +11,8 @@ import os.log
 ///    Pre-allocates exactly 16 `MTLBuffer` slots in `.storageModeShared` at initialization.
 ///    Zero runtime buffer allocations occur during inference, eliminating memory fragmentation
 ///    and dynamic kernel allocation latency.
-///    - Sizing: 17,301,504 bytes (16.50 MiB, exactly 1056 pages of 16 KB) for FP16 Qwen1.5-MoE-A2.7B.
-///    - Total memory: 16 × 17.3 MB ≈ 276.8 MB, well within system limits.
+///    - Sizing: $17,301,504$ bytes ($16.50$ MiB, exactly 1056 pages of 16 KB) for FP16 Qwen1.5-MoE-A2.7B.
+///    - Total memory: $16 \times 17.3\text{ MB} \approx 276.8\text{ MB}$, well within system limits.
 ///
 /// 2. **Slot Lifecycle State Machine**:
 ///    Each slot cycles through a strict, deterministic state machine:

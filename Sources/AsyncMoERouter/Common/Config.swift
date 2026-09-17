@@ -121,6 +121,12 @@ public struct MemoryBudgetConfig: Sendable, Equatable {
         self.executionLogCapacity = executionLogCapacity
     }
 
+    /// Convenience alias for fallback pool bytes ceiling.
+    public var fallbackPoolBytes: Int { fallbackPoolMaxBytes }
+
+    /// Convenience alias for total speculative ring buffer bytes under default/synthetic architecture.
+    public var ringBufferSlotsBytes: Int { speculativeRingBufferSlots * MoEArchitectureConfig.synthetic.expertSizeBytes }
+
     /// Total bytes allocated for the speculative Ring Buffer pool under a given architecture config.
     public func speculativeRingBufferBytes(for arch: MoEArchitectureConfig) -> Int {
         speculativeRingBufferSlots * arch.expertSizeBytes

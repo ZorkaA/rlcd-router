@@ -20,6 +20,8 @@ public final class ICBController: @unchecked Sendable {
     // MARK: - Public buffers
     /// The argument buffer wrapping the ICB (bind as `buffer(N)` with struct type `ICBContainer`).
     public let icbArgumentBuffer: any MTLBuffer
+    /// Alias for test convenience.
+    public var argumentBuffer: (any MTLBuffer)? { icbArgumentBuffer }
     /// The underlying ICB (retain reference to prevent deallocation).
     public private(set) var icb: (any MTLIndirectCommandBuffer)?
 

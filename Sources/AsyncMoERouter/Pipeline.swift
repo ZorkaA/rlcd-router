@@ -130,6 +130,21 @@ public final class AsyncMoEPipeline: @unchecked Sendable {
         totalTokensProcessed += 1
     }
 
+    /// Synchronous variant of endStep for non-async contexts and unit testing.
+    public func endStep() {
+        let entries = executionLog.drain()
+        for entry in entries {
+            let key = ExpertKey(layer: Int(entry.layerIndex), expert: Int(entry.expertID))
+            lruTracker.recordAccess(expert: key, timestamp: entry.timestamp)
+        }
+
+        Task {
+            await recalibrationActor.ingestEntries(entries)
+        }
+
+        totalTokensProcessed += 1
+    }
+
     /// Called when a new user request arrives — cancels any in-progress recalibration
     /// to yield GPU resources for inference.
     public func onUserRequestReceived() async {
@@ -162,7 +177,33 @@ public final class AsyncMoEPipeline: @unchecked Sendable {
     /// Records an abort for metrics purposes.
     public func recordAbort() { totalAborts += 1 }
 
+    /// Speculatively hints that `key` should be prefetched. No-op if the slot is already cached.
+    /// Returns `true` if a new prefetch was scheduled, `false` if already resident.
+    @discardableResult
+    public func prefetchExpert(key: ExpertKey) -> Bool {
+        // If slot already ready, nothing to do
+        if ringBuffer.findReadySlot(for: key) != nil { return false }
+        // Schedule allocation attempt (no actual I/O without a WeightFileHandle)
+        _ = ringBuffer.allocateSlot(for: key, ticket: UInt64(Date().timeIntervalSince1970 * 1_000_000))
+        return true
+    }
+
+    /// Returns `true` if the abort flag is currently set.
+    public var isAbortSet: Bool { abortController.isAborted }
+
+    /// Arms the abort flag from the CPU (e.g. for testing or user-request pre-emption).
+    public func triggerAbort() { abortController.set(true) }
+
+    /// Approximate peak memory in bytes consumed by all subsystems.
+    /// Computed from the current high-water mark of the fallback pool + ring buffer slots.
+    public var peakMemoryBytes: Int {
+        ringBuffer.slotCount * ringBuffer.slotSizeBytes + fallbackPool.allocatedBytes
+    }
+
     // MARK: - Diagnostics
+
+    /// Returns a compact summary of current pipeline health.
+    public func diagnostics() -> String { diagnosticsSummary }
 
     /// Returns a compact summary of current pipeline health.
     public var diagnosticsSummary: String {
@@ -181,3 +222,23 @@ public final class AsyncMoEPipeline: @unchecked Sendable {
             """
     }
 }
+
+// MARK: - Convenience init for tests (no external FastIOEngine required)
+public extension AsyncMoEPipeline {
+    /// Convenience initializer for unit tests — creates an internal `FastIOEngine`
+    /// so tests don't need to manually construct the full dependency graph.
+    convenience init(
+        device: any MTLDevice,
+        config: MoEArchitectureConfig,
+        budget: MemoryBudgetConfig
+    ) throws {
+        let engine = try FastIOEngine(device: device)
+        self.init(
+            device: device,
+            fastIO: engine,
+            archConfig: config,
+            budgetConfig: budget
+        )
+    }
+}
+

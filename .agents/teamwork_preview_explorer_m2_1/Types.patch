@@ -1,0 +1,57 @@
+--- a/Sources/AsyncMoERouter/Common/Types.swift
++++ b/Sources/AsyncMoERouter/Common/Types.swift
+@@ -27,16 +27,27 @@ public struct ExpertKey: Hashable, Sendable, CustomStringConvertible {
+ public enum SlotState: Equatable, Sendable {
+     /// Slot is unoccupied and ready for allocation.
+     case free
+-    /// Speculative I/O DMA read is in-flight on the speculativeQueue (PriorityLow).
++    /// Speculative I/O DMA read is in-flight on the speculativeQueue (PriorityLow). Also known as .prefetching.
+     case loading(ticket: UInt64, expert: ExpertKey)
+     /// Weights have arrived via DMA; ticket signaled on speculativeSharedEvent.
+     case ready(ticket: UInt64, expert: ExpertKey)
+     /// GPU kernel execution is currently reading from this buffer slot.
+     case inUse(ticket: UInt64, expert: ExpertKey, retainCount: Int)
+     /// Demoted/cancelled due to cache-miss demand fetch. Completion handler will drop signal and reclaim to .free.
+     case abandoned(ticket: UInt64, expert: ExpertKey)
++
++    /// Forward-compatible constructor alias matching PROJECT.md and Phase 2 requirements
++    public static func prefetching(ticket: UInt64, expert: ExpertKey) -> SlotState {
++        .loading(ticket: ticket, expert: expert)
++    }
++
++    public var isFree: Bool { if case .free = self { return true }; return false }
++    public var isPrefetching: Bool { if case .loading = self { return true }; return false }
++    public var isReady: Bool { if case .ready = self { return true }; return false }
++    public var isInUse: Bool { if case .inUse = self { return true }; return false }
++    public var isAbandoned: Bool { if case .abandoned = self { return true }; return false }
+ }
+ 
+ /// A pre-allocated unified memory slot inside the speculative Ring Buffer Pool.
+ public final class RingBufferSlot: @unchecked Sendable {
+@@ -54,16 +65,21 @@ public final class RingBufferSlot: @unchecked Sendable {
+     /// Dedicated MTLSharedEvent for this slot to eliminate out-of-order race conditions.
+     public var sharedEvent: (any MTLSharedEvent)?
+     /// Signal ticket value expected for the active or most recent DMA transfer into this slot.
+     public var signalValue: UInt64
++    /// Dedicated SyncEvent wrapper for this slot ensuring zero cross-slot ticket interference.
++    public var syncEvent: SyncEvent?
+ 
+     public init(
+         index: Int,
+         buffer: any MTLBuffer,
+         sharedEvent: (any MTLSharedEvent)? = nil,
+-        signalValue: UInt64 = 0
++        signalValue: UInt64 = 0,
++        syncEvent: SyncEvent? = nil
+     ) {
+         self.index = index
+         self.buffer = buffer
+         self.state = .free
+         self.lastAccessedTimestamp = 0
+         self.inFlightIOCommand = nil
+-        self.sharedEvent = sharedEvent
++        self.sharedEvent = sharedEvent ?? syncEvent?.sharedEvent
+         self.signalValue = signalValue
++        self.syncEvent = syncEvent
+     }
+ }

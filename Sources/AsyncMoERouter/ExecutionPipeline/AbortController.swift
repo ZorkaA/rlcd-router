@@ -50,8 +50,14 @@ public final class AbortController: @unchecked Sendable {
         _ptr[0] = 0
     }
 
-    /// Returns `true` if the GPU set the abort flag (cache miss on current token).
-    /// Call this in the compute command buffer's completion handler.
+    /// Explicitly sets the abort flag to `value` from the CPU.
+    /// Primarily used in tests and abort-injection scenarios.
+    /// The GPU sets this flag natively via the MSL Gating Kernel.
+    public func set(_ value: Bool) {
+        _ptr[0] = value ? 1 : 0
+    }
+
+    /// Returns `true` if the abort flag is currently set (either by GPU or CPU).
     public var isAborted: Bool {
         return _ptr[0] != 0
     }

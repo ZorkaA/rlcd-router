@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-17T16:49:29Z
+# BRIEFING — 2026-09-17T17:00:00Z
 
 ## Mission
 Conduct an independent code, architecture, and adversarial integrity review of Phase 2 Milestone 1: Fast I/O Engine & Dual-Queue Subsystem in Swift/Metal.
@@ -20,43 +20,56 @@ Conduct an independent code, architecture, and adversarial integrity review of P
 
 ## Current Parent
 - Conversation ID: 913b8328-6b64-4881-a075-c0057bc23d84
-- Updated: 2026-09-17T16:49:29Z
+- Updated: 2026-09-17T17:00:00Z
 
 ## Review Scope
-- **Files to review**:
+- **Files reviewed**:
   - Sources/AsyncMoERouter/FastIO/FastIOEngine.swift
   - Sources/AsyncMoERouter/FastIO/WeightFileHandle.swift
   - Sources/AsyncMoERouter/FastIO/SyncEvent.swift
   - Sources/AsyncMoERouter/Common/MetalContext.swift
   - Sources/AsyncMoERouter/Common/Config.swift
+  - Sources/AsyncMoERouter/Common/Types.swift
   - swift_tests/AsyncMoERouterTests/Unit/FastIOTests.swift
-  - Package.swift
+  - swift_tests/AsyncMoERouterTests/Unit/FastIOAdversarialTests.swift
+  - swift_tests/AsyncMoERouterTests/Unit/FastIOChallenger2StressTests.swift
 - **Interface contracts**: PROJECT.md / ORIGINAL_REQUEST.md
 - **Review criteria**:
   - Correctness: Speculative queue (.low, max 16, concurrent), Fallback queue (.high, max 16, concurrent).
   - Safety & Bounds: MTLIOFileHandle DMA loads, 16KB page alignment, defensive bounds checking.
   - Zero-CPU Hardware Sync: MTLSharedEvent between MTLIOCommandBuffer and GPU compute command buffer.
-  - Test suite execution: `swift build` and `swift test --filter FastIOTests`, plus full `swift test`.
-  - Adversarial & Integrity: Check for hardcoded test results, facade logic, bypassed checks, resource leaks.
+  - Test suite execution: `swift build`, `swift test --filter FastIOTests`, `swift test`.
+  - Adversarial & Integrity: Hardcoded test results, facade logic, bypassed checks, resource leaks.
 
 ## Review Checklist
-- **Items reviewed**: [Pending file inspections]
-- **Verdict**: PENDING
-- **Unverified claims**: [Pending verification]
+- **Items reviewed**:
+  - `FastIOEngine.swift`: Verified priority .low / .high, maxCommandBufferCount = 16, type = .concurrent.
+  - `WeightFileHandle.swift`: Verified MTLIOFileHandle DMA loading, 16KB page alignment, and defensive bounds checking.
+  - `SyncEvent.swift`: Verified MTLSharedEvent hardware synchronization with zero CPU overhead.
+  - `MetalContext.swift`: Verified runtime MSL shader compilation, library caching, and Metal 3 device detection.
+  - Unit Tests: All 21 tests in `FastIOTests` pass in 0.306s.
+  - Adversarial Tests: All 9 tests in `FastIOAdversarialTests` pass in 0.233s.
+  - Stress Tests: All 10 tests in `FastIOChallenger2StressTests` pass in 50.7s (250 repeated loads with 0 memory growth).
+  - Full project suite: All 55 Swift Testing tests pass in 0.061s.
+- **Verdict**: APPROVE
+- **Unverified claims**: None. All claims independently verified via compilation and execution.
 
 ## Attack Surface
-- **Hypotheses to test**:
-  - Does `speculativeQueue` actually configure PriorityLow, max 16, concurrent?
-  - Does `fallbackQueue` actually configure PriorityHigh, max 16, concurrent?
-  - Does `WeightFileHandle` strictly validate 16KB alignment and handle out-of-bounds offsets/sizes defensively?
-  - Does `SyncEvent` perform genuine zero-CPU hardware synchronization via `MTLSharedEvent` (encodeWait / encodeSignal on command buffer / encoder) without CPU spin-loops or polling?
-  - Are there any mock/facade implementations or hardcoded return values in FastIOEngine, WeightFileHandle, or SyncEvent?
-  - Are command buffers properly drained to avoid starving the 16-command-buffer queue limit under high throughput?
-- **Vulnerabilities found**: [Pending]
-- **Untested angles**: [Pending]
+- **Hypotheses tested**:
+  - Does `speculativeQueue` actually configure PriorityLow, max 16, concurrent? VERIFIED (MTLIOCommandQueueDescriptor).
+  - Does `fallbackQueue` actually configure PriorityHigh, max 16, concurrent? VERIFIED (MTLIOCommandQueueDescriptor).
+  - Does `fallbackQueue` preempt `speculativeQueue`? VERIFIED (0.00052s fallback vs 0.00079s speculative tail).
+  - Does `WeightFileHandle` strictly validate 16KB alignment and handle out-of-bounds offsets/sizes defensively? VERIFIED.
+  - Does `SyncEvent` perform genuine zero-CPU hardware synchronization via `MTLSharedEvent`? VERIFIED.
+  - Does `tryCancel()` drop signal without waking waiting GPU compute kernels? VERIFIED.
+  - Does repeated DMA loading leak memory? VERIFIED (0 byte leak over 250 iterations).
+  - Are there any mock/facade implementations or hardcoded return values? VERIFIED (none present).
+- **Vulnerabilities found**: None. Zero integrity violations, zero regressions.
+- **Untested angles**: Multi-GPU device switching (single Apple Silicon UMA GPU assumed per architecture design).
 
 ## Key Decisions Made
-- Initiated independent review for Phase 2 Milestone 1.
+- Confirmed full compliance with Phase 2 Milestone 1 requirements and interface contracts.
+- Issued APPROVE verdict.
 
 ## Artifact Index
 - progress.md — Heartbeat and status

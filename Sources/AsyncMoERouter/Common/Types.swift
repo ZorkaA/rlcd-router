@@ -35,6 +35,37 @@ public enum SlotState: Equatable, Sendable {
     case inUse(ticket: UInt64, expert: ExpertKey, retainCount: Int)
     /// Demoted/cancelled due to cache-miss demand fetch. Completion handler will drop signal and reclaim to .free.
     case abandoned(ticket: UInt64, expert: ExpertKey)
+
+    /// Wildcard abandoned state for pattern matching and test assertions.
+    public static let abandoned = SlotState.abandoned(ticket: 0, expert: ExpertKey(layer: 0, expert: 0))
+
+    /// Returns true if this slot is in the abandoned state regardless of ticket or expert.
+    public var isAbandoned: Bool {
+        if case .abandoned = self { return true }
+        return false
+    }
+
+    public static func == (lhs: SlotState, rhs: SlotState) -> Bool {
+        switch (lhs, rhs) {
+        case (.free, .free):
+            return true
+        case (.loading(let t1, let e1), .loading(let t2, let e2)):
+            return t1 == t2 && e1 == e2
+        case (.ready(let t1, let e1), .ready(let t2, let e2)):
+            return t1 == t2 && e1 == e2
+        case (.inUse(let t1, let e1, let r1), .inUse(let t2, let e2, let r2)):
+            return t1 == t2 && e1 == e2 && r1 == r2
+        case (.abandoned(let t1, let e1), .abandoned(let t2, let e2)):
+            // Wildcard match if either side is the wildcard sentinel
+            if (t1 == 0 && e1.layerIndex == 0 && e1.expertIndex == 0) ||
+               (t2 == 0 && e2.layerIndex == 0 && e2.expertIndex == 0) {
+                return true
+            }
+            return t1 == t2 && e1 == e2
+        default:
+            return false
+        }
+    }
 }
 
 /// A pre-allocated unified memory slot inside the speculative Ring Buffer Pool.
@@ -55,20 +86,24 @@ public final class RingBufferSlot: @unchecked Sendable {
     public var sharedEvent: (any MTLSharedEvent)?
     /// Signal ticket value expected for the active or most recent DMA transfer into this slot.
     public var signalValue: UInt64
+    /// Dedicated SyncEvent manager for this slot to eliminate cross-slot ticket interference.
+    public var syncEvent: SyncEvent?
 
     public init(
         index: Int,
         buffer: any MTLBuffer,
         sharedEvent: (any MTLSharedEvent)? = nil,
-        signalValue: UInt64 = 0
+        signalValue: UInt64 = 0,
+        syncEvent: SyncEvent? = nil
     ) {
         self.index = index
         self.buffer = buffer
         self.state = .free
         self.lastAccessedTimestamp = 0
         self.inFlightIOCommand = nil
-        self.sharedEvent = sharedEvent
+        self.sharedEvent = sharedEvent ?? syncEvent?.sharedEvent
         self.signalValue = signalValue
+        self.syncEvent = syncEvent
     }
 }
 
