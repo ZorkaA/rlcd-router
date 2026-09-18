@@ -1,0 +1,54 @@
+--- a/Sources/AsyncMoERouter/ExecutionPipeline/LRUWeightTracker.swift
++++ b/Sources/AsyncMoERouter/ExecutionPipeline/LRUWeightTracker.swift
+@@ -26,7 +26,7 @@
+ ///    recency metadata with minimal lock contention (<15ns lock acquisition via `OSAllocatedUnfairLock`).
+ ///
+ /// 3. **O(1) Recency Operations**:
+-///    - `touch(expertKey:timestamp:slotIndex:)`: O(1) recency promotion and timestamp update.
++///    - `touch(expertKey:timestamp:slotIndex:)`: O(1) recency promotion and timestamp update with monotonic queue protection.
+ ///    - `evictionCandidate()`: O(1) non-mutating peek at LRU tail victim.
+ ///    - `evictLRU()`: O(1) unlinking and removal of least-recently-used expert.
+ ///    - `remove(expertKey:)`: O(1) arbitrary key invalidation.
+@@ -81,8 +81,10 @@
+ 
+     /// Records or updates the recency of an expert key following verified GPU execution.
+     ///
+-    /// Promotes the node to the MRU head position, updates its timestamp monotonically,
+-    /// and optionally updates the associated ring buffer slot index.
++    /// Promotes the node to the MRU head position ONLY if its timestamp is monotonically non-decreasing.
++    /// If an older out-of-order entry arrives (`timestamp < node.timestamp`), its position in the
++    /// recency queue is strictly preserved to prevent stale log arrivals from demoting active experts.
++    /// If `node.slotIndex == nil`, an incoming `slotIndex` will be bound without altering queue recency.
+     ///
+     /// - Parameters:
+     ///   - expertKey: The expert uniquely identified across layers.
+@@ -93,15 +95,23 @@
+             state.totalUpdates += 1
+ 
+             if let node = state.map[expertKey] {
+-                // Monotonic guard: preserve later timestamp if an older entry arrives out-of-order
++                // Monotonic guard: only update timestamp and promote to MRU if the incoming
++                // entry is newer or at the same timestamp as the expert's recorded execution.
+                 if timestamp >= node.timestamp {
+                     node.timestamp = timestamp
+-                }
+-                if let slot = slotIndex {
+-                    node.slotIndex = slot
++                    if let slot = slotIndex {
++                        node.slotIndex = slot
++                    }
++                    Self._unlink(node: node)
++                    Self._insertAfterHead(node: node, head: state.head)
++                } else {
++                    // Out-of-order stale entry (timestamp < node.timestamp):
++                    // Preserve the node's position in the recency queue and protect node.timestamp from regression.
++                    // Safely bind slotIndex only if the node currently has no slot assigned.
++                    if node.slotIndex == nil, let slot = slotIndex {
++                        node.slotIndex = slot
++                    }
+                 }
+-                Self._unlink(node: node)
+-                Self._insertAfterHead(node: node, head: state.head)
+             } else {
+                 let node = Node(key: expertKey, timestamp: timestamp, slotIndex: slotIndex)
+                 state.map[expertKey] = node

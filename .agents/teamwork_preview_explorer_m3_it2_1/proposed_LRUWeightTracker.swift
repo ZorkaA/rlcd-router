@@ -26,7 +26,7 @@ import os.log
 ///    recency metadata with minimal lock contention (<15ns lock acquisition via `OSAllocatedUnfairLock`).
 ///
 /// 3. **O(1) Recency Operations**:
-///    - `touch(expertKey:timestamp:slotIndex:)`: O(1) recency promotion and timestamp update.
+///    - `touch(expertKey:timestamp:slotIndex:)`: O(1) recency promotion and timestamp update with monotonic queue protection.
 ///    - `evictionCandidate()`: O(1) non-mutating peek at LRU tail victim.
 ///    - `evictLRU()`: O(1) unlinking and removal of least-recently-used expert.
 ///    - `remove(expertKey:)`: O(1) arbitrary key invalidation.

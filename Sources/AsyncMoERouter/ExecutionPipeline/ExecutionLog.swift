@@ -22,6 +22,9 @@ import os
 ///   `slot = ((tokenIndex * expertsPerToken) + rank) & (capacity - 1)`.
 /// - **Dispatch-Time LRU Authority**: CPU drains this buffer post-execution to update
 ///   `LRUWeightTracker`. Timestamps are NEVER updated during pre-routing speculative predictions.
+/// - **Universal Drain Scanner**: Post-execution CPU draining uses a 128 KB circular sweep
+///   scanner (`continue`), reliably consuming contiguous, sparse, or gapped entries from any
+///   MSL logging kernel without dropping records or locking `readHead`.
 /// - **Thread Safety**: State transitions and head advances are protected by `OSAllocatedUnfairLock`.
 public final class ExecutionLog: @unchecked Sendable {
     // MARK: - Constants
@@ -143,8 +146,10 @@ public final class ExecutionLog: @unchecked Sendable {
     
     /// Drains all newly written entries from the GPU Execution Log.
     ///
-    /// Consumes entries sequentially from `readHead` until an unwritten (zeroed) sentinel slot
-    /// is encountered. Consumed slots are cleared to zero to ensure clean subsequent drains.
+    /// Scans the circular ring buffer starting at `readHead` across all `capacity` slots.
+    /// Uses non-blocking `continue` to seamlessly consume both contiguous streams and sparse/gapped
+    /// slot formulations without premature termination. Consumed slots are reset to all-zeros sentinel
+    /// state, guaranteeing idempotent subsequent drains.
     ///
     /// - Returns: Array of valid `ExecutionLogEntry` records written since the last drain.
     public func drain() -> [ExecutionLogEntry] {
@@ -152,18 +157,27 @@ public final class ExecutionLog: @unchecked Sendable {
             let ptr = entryPointer
             let mask = capacity - 1
             var entries = [ExecutionLogEntry]()
-            var scanned = 0
+            entries.reserveCapacity(min(capacity, 256))
+            var lastOccupiedOffset: Int? = nil
             
-            while scanned < capacity {
-                let slot = (state.readHead + scanned) & mask
+            for offset in 0..<capacity {
+                let slot = (state.readHead + offset) & mask
                 let entry = ptr[slot]
                 
-                // Sentinel test: unwritten slots have tokenIndex == 0 AND timestamp == 0 AND confidenceScore == 0
-                guard entry.tokenIndex != 0 || entry.timestamp != 0 || entry.confidenceScore != 0 else {
-                    break
+                // Robust sentinel check: an unwritten or cleared slot has all fields zero.
+                // Any non-zero field indicates an active, written execution log entry.
+                guard entry.tokenIndex != 0
+                   || entry.timestamp != 0
+                   || entry.confidenceScore != 0
+                   || entry.layerIndex != 0
+                   || entry.expertID != 0
+                   || entry.horizonIndex != 0
+                   || entry.reserved != 0 else {
+                    continue
                 }
                 
                 entries.append(entry)
+                lastOccupiedOffset = offset
                 
                 // Clear entry after consumption so subsequent drains do not re-process stale slots
                 ptr[slot] = ExecutionLogEntry(
@@ -175,15 +189,18 @@ public final class ExecutionLog: @unchecked Sendable {
                     timestamp: 0,
                     reserved: 0
                 )
-                scanned += 1
             }
             
-            state.readHead = (state.readHead + scanned) & mask
-            state.totalEntriesDrained += scanned
+            // Advance readHead to the slot immediately following the last drained entry in scan sequence
+            if let lastOffset = lastOccupiedOffset {
+                state.readHead = (state.readHead + lastOffset + 1) & mask
+            }
+            state.totalEntriesDrained += entries.count
             
-            if scanned > 0 {
+            if !entries.isEmpty {
                 let total = state.totalEntriesDrained
-                _log.debug("ExecutionLog: Drained \(scanned) entries (total drained: \(total))")
+                let newHead = state.readHead
+                _log.debug("ExecutionLog: Drained \(entries.count) entries (total drained: \(total), new readHead: \(newHead))")
             }
             
             return entries

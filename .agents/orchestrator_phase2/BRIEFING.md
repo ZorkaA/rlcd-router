@@ -81,17 +81,26 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 | explorer_m3_1 | teamwork_preview_explorer | M3 Execution Log Architecture | done | 02352475-b372-491b-94b7-7a6d151ae5e8 |
 | spec_miner_m3_2 | teamwork_preview_spec_miner | M3 CPU Drain & LRU Specs | done | e3b1347e-9784-446b-af63-44df843acbe2 |
 | explorer_m3_3 | teamwork_preview_explorer | M3 Test Harness & Synthetic Kernels | done | 0c8809d4-bb8e-4c6e-ad0f-b3c85d788d15 |
-| worker_m3_1 | teamwork_preview_worker | M3 Execution Log & LRU Implementation | in-progress | 0c0c087a-21ae-434e-af81-f91c7e6d867f |
+| worker_m3_1 | teamwork_preview_worker | M3 Execution Log & LRU Implementation | done | 0c0c087a-21ae-434e-af81-f91c7e6d867f |
+| reviewer_m3_1 | teamwork_preview_reviewer | M3 Execution Log Review | done (APPROVE) | 15abf870-e550-474c-a4ac-d9d42a5cc346 |
+| reviewer_m3_2 | teamwork_preview_reviewer | M3 LRU Invariant Review | done (APPROVE) | 994adaeb-cc13-4d3a-a105-3159d9f95e2c |
+| challenger_m3_1 | teamwork_preview_challenger | M3 Post-Execution LRU Challenger | done (REQUEST_CHANGES) | c0ff55af-bcd9-40a7-b173-a415f97261b4 |
+| challenger_m3_2 | teamwork_preview_challenger | M3 Concurrency & Wraparound Challenger | done (REQUEST_CHANGES) | 1fb33375-f3ed-4c83-b735-bab1bcc69aa0 |
+| auditor_m3_1 | teamwork_preview_auditor | M3 Forensic Integrity Audit | done (INTEGRITY VIOLATION) | 485a139d-214e-4695-8b2f-c64eea1ccb55 |
+| explorer_m3_it2_1 | teamwork_preview_explorer | M3 LRU Remediation Blueprint | done | 5e21bc0a-b14e-470d-b7c1-8e08fd8fa92b |
+| spec_miner_m3_it2_2 | teamwork_preview_spec_miner | M3 Slot Indexing & Drain Blueprint | done | 0a1f3daa-815e-4d1e-8450-9bf7d4d9fb66 |
+| explorer_m3_it2_3 | teamwork_preview_explorer | M3 MSL Compilation & Test Blueprint | done | 81ba918c-3ab8-4425-ad33-64ddc3914ed6 |
+| worker_m3_2 | teamwork_preview_worker | M3 Execution Pipeline Remediation | in-progress | a3738f17-056b-4319-bbe0-4e31f6a058ce |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 11 / 16
-- Pending subagents: worker_m3_1
+- Spawn count: 20 / 128
+- Pending subagents: worker_m3_2
 - Predecessor: Gen 1 (913b8328-6b64-4881-a075-c0057bc23d84)
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: 913b8328-6b64-4881-a075-c0057bc23d84/task-453
+- Heartbeat cron: 913b8328-6b64-4881-a075-c0057bc23d84/task-1162
 - Safety timer: none
 - On succession: kill all timers before spawning successor
 - On context truncation: run `manage_task(Action="list")` — re-create if missing
@@ -102,4 +111,5 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/progress.md — Liveness heartbeat and milestone progress
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/PROJECT.md — Authoritative Phase 2 project architecture
 - /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/GATE_STATUS.md — Gate verdicts log
-- /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/handoff.md — Soft handoff for Gen 2 successor
+- /Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2/handoff.md — Soft handoff for Gen 3 successor
+
