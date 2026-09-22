@@ -46,3 +46,41 @@ Implement a background Swift task that reads the Execution Log for Brier-score r
 - Regularly update `progress.md` and `BRIEFING.md` in your working directory (.agents/orchestrator_phase2) so the Sentinel can track status and liveness.
 - Report milestone completions, and when complete, signal completion for independent victory audit.
 </USER_REQUEST>
+
+## 2026-09-18T14:53:12Z
+
+<USER_REQUEST>
+You are the Project Orchestrator for Phase 2: Swift/Metal Execution Pipeline of the Asynchronous MoE Router project.
+
+Your assigned working directory is:
+/Users/jack/Downloads/rlcd-router/.agents/orchestrator_phase2
+
+The authoritative user request is recorded in:
+/Users/jack/Downloads/rlcd-router/ORIGINAL_REQUEST.md
+
+Parent conversation ID: a5f73969-29b5-428b-8fc7-6668d9413e08 (Sentinel). Use this ID for all escalation, status reporting, and handoffs (send_message).
+
+## Project State:
+- Milestone 1 (Fast I/O Engine & Dual-Queue Subsystem - Requirement R1): PASSED GATE (Commit 9361c6b).
+- Milestone 2 (Speculative Ring Buffer & 500MB Isolated Fallback Pool - Requirement R2): PASSED GATE (Commit 6f0f198).
+- Milestone 3 (GPU Execution Log & Dispatch-Time LRU Tracking - Requirement R3):
+  - Iteration 2 implementation committed to master (Commit f42e5f1, docs commit 5c67b4b).
+  - Forensic Auditor auditor_m3_2 delivered CLEAN (APPROVED) in .agents/teamwork_preview_auditor_m3_2/handoff.md.
+  - Reviewer 4 (reviewer_m3_4) and Challenger 4 (challenger_m3_4) delivered APPROVE in their handoff.md files.
+  - All 97 tests pass cleanly.
+
+## Immediate Objectives:
+1. Initialize your BRIEFING.md and schedule your heartbeat cron (`schedule(CronExpression="*/10 * * * *")`).
+2. Synthesize Milestone 3 Iteration 2 verification verdicts in `GATE_STATUS.md` and mark Milestone 3 Gate PASSED.
+3. Proceed immediately to:
+   - Milestone 4: ICB Native Conditional Execution & Cascading Abort (Requirement R4)
+   - Milestone 5: MLX Cache Limiting & Background Recalibration (Requirement R5)
+   - Milestone 6: Full Pipeline Integration & E2E Acceptance (Features 14, 15)
+4. Enforce conservative memory budget (<= 1.22 GB) across Ring Buffer and MLX limits.
+5. Signal completion to the Sentinel when all milestones pass gates and 100% of E2E tests pass, for the independent Victory Audit.
+
+## Hard Constraints:
+- Pure orchestrator: DISPATCH-ONLY. NEVER write source code directly or run builds yourself. Decompose and dispatch to specialists.
+- Regularly update `progress.md` and `BRIEFING.md` in your working directory.
+- Proactively commit milestones per global user rule.
+</USER_REQUEST>

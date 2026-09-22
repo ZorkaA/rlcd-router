@@ -73,7 +73,7 @@ Phase 2 implements the high-performance, asynchronous Swift/Metal execution pipe
 |---|------|-------|-------------|--------|
 | M1 | Fast I/O Engine & Dual-Queue Subsystem | SwiftPM layout, runtime MSL compilation manager, dual Fast I/O queues, MTLIOFileHandle block loading, MTLSharedEvent zero-CPU sync (Features 1, 2, 3) | none | DONE |
 | M2 | Ring Buffer & Isolated Fallback Buffer Pools | 16-slot speculative Ring Buffer, isolated 500MB Fallback Pool, cache-miss deadlock resolution, slot abandonment & signal drop (Features 4, 5, 6) | M1 | DONE |
-| M3 | GPU Execution Log & Dispatch-Time LRU Tracking | 32-byte circular Execution Log buffer, zero-atomic GPU logging kernel, lock-free CPU drain, O(1) LRU weight tracker (Features 7, 8) | M1 | PLANNED |
+| M3 | GPU Execution Log & Dispatch-Time LRU Tracking | 32-byte circular Execution Log buffer, zero-atomic GPU logging kernel, lock-free CPU drain, O(1) LRU weight tracker (Features 7, 8) | M1 | DONE |
 | M4 | ICB Native Conditional Execution & Cascading Abort | Global 1-byte abort_flag, Argument Buffer ICB container, zero-thread conditional grid dispatch, cascading no-ops, hazard tracking preservation, residual stream x invariance (Features 9, 10, 11) | M1 | PLANNED |
 | M5 | MLX Cache Limiting & Background Recalibration | 200MB MLX metal cache limit, async background RecalibrationActor, Brier score optimization with analytical gradient (Features 12, 13) | M1, M3 | PLANNED |
 | M6 | Full Pipeline Integration & E2E Acceptance | Integrated pipeline runner, full E2E Test Suite (Tiers 1-4) passing 100%, Tier 5 Adversarial Coverage Hardening (Features 14, 15) | M1, M2, M3, M4, M5 | PLANNED |

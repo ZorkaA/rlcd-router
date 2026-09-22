@@ -9,7 +9,7 @@ Supervise the execution of Phase 2 (Swift/Metal Execution Pipeline) for Asynchro
 - Orchestrator (Phase 1): ce5bc762-f633-465c-9133-7ec43d0b5719
 - Victory Auditor: to be spawned on victory claim
 - Cron 1 (Progress Reporting): c05492d0-b615-498a-8e27-c0ba07c424c9/task-23
-- Phase 2 Orchestrator: 913b8328-6b64-4881-a075-c0057bc23d84
+- Phase 2 Orchestrator: e2a44eff-a871-43c3-91e1-8c9ad7b27aa8
 - Phase 2 Cron 1 (Progress Reporting): a5f73969-29b5-428b-8fc7-6668d9413e08/task-49
 - Phase 2 Cron 2 (Liveness Check): a5f73969-29b5-428b-8fc7-6668d9413e08/task-51
 

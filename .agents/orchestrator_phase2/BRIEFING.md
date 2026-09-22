@@ -34,6 +34,11 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
   7. M6: Full Pipeline Integration & E2E Acceptance [pending]
 - **Current phase**: 3 (Milestone 3 Execution Log & Dispatch-Time LRU)
 - **Current focus**: Milestone 3 Exploration & Blueprint Authoring
+- **Phase 4 Status Append**:
+  - Milestone 3: PASSED GATE (Commit f42e5f1, docs 5c67b4b, 97 tests pass)
+  - Milestone 4: IN-PROGRESS (ICB Native Conditional Execution & Cascading Abort)
+  - Active phase: Phase 4
+  - Active focus: Milestone 4 Exploration & Implementation Design
 
 ## 🔒 Key Constraints
 - Pure orchestrator: DISPATCH-ONLY. NEVER write, modify, or create source code directly. NEVER run build/test commands. NEVER investigate code directly. Only write metadata (.md) in own .agents/ folder.
@@ -52,6 +57,8 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 - Completed M1 with unanimous approvals; commit 9361c6b created.
 - Completed M2 exploration (explorer_m2_1, spec_miner_m2_2, explorer_m2_3); blueprints ready for implementation.
 - Executed self-succession at 16 spawns.
+- Completed M3 Iteration 2 with unanimous approvals (Auditor CLEAN, Reviewer APPROVE, Challenger APPROVE, 97 tests pass); commit f42e5f1. Gate PASSED.
+- Initiated Milestone 4 (ICB Native Conditional Execution & Cascading Abort - Requirement R4).
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
@@ -90,17 +97,23 @@ Orchestrate Phase 2 (Swift/Metal Execution Pipeline) of Asynchronous MoE Router 
 | explorer_m3_it2_1 | teamwork_preview_explorer | M3 LRU Remediation Blueprint | done | 5e21bc0a-b14e-470d-b7c1-8e08fd8fa92b |
 | spec_miner_m3_it2_2 | teamwork_preview_spec_miner | M3 Slot Indexing & Drain Blueprint | done | 0a1f3daa-815e-4d1e-8450-9bf7d4d9fb66 |
 | explorer_m3_it2_3 | teamwork_preview_explorer | M3 MSL Compilation & Test Blueprint | done | 81ba918c-3ab8-4425-ad33-64ddc3914ed6 |
-| worker_m3_2 | teamwork_preview_worker | M3 Execution Pipeline Remediation | in-progress | a3738f17-056b-4319-bbe0-4e31f6a058ce |
+| worker_m3_2 | teamwork_preview_worker | M3 Execution Pipeline Remediation | done (commit f42e5f1) | a3738f17-056b-4319-bbe0-4e31f6a058ce |
+| reviewer_m3_4 | teamwork_preview_reviewer | M3 Concurrency Review (It 2) | done (APPROVE) | 90174f60-5933-40bc-bbc2-2f6a51ff1e7e |
+| challenger_m3_4 | teamwork_preview_challenger | M3 Wraparound Stress Challenger (It 2) | done (APPROVE) | 91f2076a-a85b-42fe-a7ef-59b6235a2521 |
+| auditor_m3_2 | teamwork_preview_auditor | M3 Forensic Integrity Audit (It 2) | done (CLEAN) | b342df88-ef21-4036-b43f-5e30a76ad86d |
+| explorer_m4_1 | teamwork_preview_explorer | M4 AbortController & Invariance Blueprint | in-progress | b0f1d803-6055-4c69-b6ef-c675ded6f9e7 |
+| spec_miner_m4_2 | teamwork_preview_spec_miner | M4 Metal 3 ICB Specification & Native Gating | in-progress | 6a551e5c-7e6c-4443-9c62-30e8e560ca80 |
+| explorer_m4_3 | teamwork_preview_explorer | M4 Cascading No-Op Shaders & Test Suite Design | in-progress | 27049b54-f3d0-42ab-917c-7d046b48fcd8 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 20 / 128
-- Pending subagents: worker_m3_2
-- Predecessor: Gen 1 (913b8328-6b64-4881-a075-c0057bc23d84)
+- Spawn count: 3 / 16 (current orchestrator session)
+- Pending subagents: b0f1d803-6055-4c69-b6ef-c675ded6f9e7, 6a551e5c-7e6c-4443-9c62-30e8e560ca80, 27049b54-f3d0-42ab-917c-7d046b48fcd8
+- Predecessor: Gen 1 & Gen 2
 - Successor: not yet spawned
 
 ## Active Timers
-- Heartbeat cron: 913b8328-6b64-4881-a075-c0057bc23d84/task-1162
+- Heartbeat cron: e2a44eff-a871-43c3-91e1-8c9ad7b27aa8/task-42
 - Safety timer: none
 - On succession: kill all timers before spawning successor
 - On context truncation: run `manage_task(Action="list")` — re-create if missing
