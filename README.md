@@ -6,7 +6,7 @@ Standard execution of massive Mixture of Experts (MoE) models via SSD offloading
 ---
 
 ## 1. Project Background and The I/O Bottleneck
-In a standard MoE block, the router function $R(x)$ assigns token representations to a top-$k$ subset of $E$ total experts. 
+In a standard MoE block, the router function $R(x)$ assigns token representations to a top- $k$ subset of $E$ total experts. 
 
 $$ \text{Output} = \sum_{i \in \text{TopK}(R(x))} R(x)_i \cdot \text{Expert}_i(x) $$
 
