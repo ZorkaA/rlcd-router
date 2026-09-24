@@ -26,23 +26,23 @@ To eliminate the $T_{fetch}$ term from the critical path, we introduce **Asynchr
 
 ```mermaid
 graph TD
-    subgraph Compute Stream (Synchronous)
-        A[Input Token t] --> B[Shared Attention & Early Layers]
-        B --> C{Resident Cache Check}
-        C -- Hit --> D[Compute MoE Layer]
-        C -- Miss --> E((Abort Flag / Stall))
-        E -.-> F[Fallback Sync Fetch]
+    subgraph ComputeStream ["Compute Stream (Synchronous)"]
+        A["Input Token t"] --> B["Shared Attention & Early Layers"]
+        B --> C{"Resident Cache Check"}
+        C -- Hit --> D["Compute MoE Layer"]
+        C -- Miss --> E(("Abort Flag / Stall"))
+        E -.-> F["Fallback Sync Fetch"]
         F -.-> D
-        D --> G[Output Logits t]
+        D --> G["Output Logits t"]
     end
 
-    subgraph I/O Stream (Asynchronous)
-        B -.-> H[RLCD Speculative Head]
-        H --> I[Predict Top-K for t+1, t+2]
-        I --> J[Filter vs. Resident LRU Cache]
-        J --> K[Dispatch PriorityLow Block Reads]
-        K --> L[(SSD Disk)]
-        L --> M[Metal Ring Buffer]
+    subgraph IOStream ["I/O Stream (Asynchronous)"]
+        B -.-> H["RLCD Speculative Head"]
+        H --> I["Predict Top-K for t+1, t+2"]
+        I --> J["Filter vs. Resident LRU Cache"]
+        J --> K["Dispatch PriorityLow Block Reads"]
+        K --> L[("SSD Disk")]
+        L --> M["Metal Ring Buffer"]
         M -.-> C
     end
 ```
