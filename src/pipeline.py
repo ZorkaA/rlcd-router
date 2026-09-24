@@ -404,13 +404,17 @@ def run_pipeline(
     if synthetic:
         model = _run_synthetic_training(train_data, config, resolved_device)
     else:
-        # In production, import and use MedusaSpeculativeHead + Trainer
-        logger.info("Loading pre-trained speculative head from %s", config.training.checkpoint_path)
-        # Placeholder for M2 integration
-        raise NotImplementedError(
-            "Production speculative head training requires M2 modules. "
-            "Use --synthetic for testing."
+        from src.training.trainer import Trainer
+        logger.info("Starting production speculative head training...")
+        trainer = Trainer(
+            config=config.training,
+            device=resolved_device,
+            hidden_states=train_data["hidden_states"],
+            target_router_logits=train_data["target_router_logits"],
+            valid_mask=train_data["valid_mask"],
         )
+        trainer.train()
+        model = trainer.get_model()
 
     report["timings"]["training_phase_seconds"] = time.time() - phase_start
     report["phases"]["training"] = {
@@ -430,11 +434,28 @@ def run_pipeline(
             calib_data, model, config, resolved_device
         )
     else:
-        # In production, use TemperatureGrid from M3
-        raise NotImplementedError(
-            "Production temperature scaling requires M3 modules. "
-            "Use --synthetic for testing."
+        from src.calibration.lbfgs_optimizer import LBFGSTemperatureOptimizer
+        
+        optimizer = LBFGSTemperatureOptimizer(
+            config=config.calibration,
+            device=resolved_device,
         )
+        # We need to compute the speculative unscaled logits first.
+        # But wait, grid optimization takes the model and the calibration data.
+        with torch.inference_mode():
+            calib_hs = calib_data["hidden_states"].to(resolved_device)
+            # The speculative head expects (N, 2048) and returns (N, H, L, E)
+            spec_logits = model(calib_hs)
+            
+        # Optimize temperatures
+        grid = optimizer.fit(
+            unscaled_logits=spec_logits,
+            target_router_logits=calib_data["target_router_logits"].to(resolved_device),
+        )
+        # Calculate calibrated probabilities
+        scaled_logits = grid.scale_logits(spec_logits)
+        calibrated_probs = torch.nn.functional.softmax(scaled_logits, dim=-1)
+        ground_truth_top4 = calib_data["target_top4_indices"].to(resolved_device)
 
     report["timings"]["calibration_phase_seconds"] = time.time() - phase_start
     report["phases"]["calibration"] = {
