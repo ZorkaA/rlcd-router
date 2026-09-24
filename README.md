@@ -71,7 +71,7 @@ The solution is the **LRU Cache (Resident Memory)**. In large MoEs, experts exhi
 
 The required SSD bandwidth $B_{ssd}$ becomes:
 
-$$ B_{ssd} = \frac{N_{active} \cdot \text{Bytes} \cdot (1 - P(\text{hit}))}{T_{\text{target\_latency}}} $$
+$$ B_{ssd} = \frac{N_{active} \cdot \text{Bytes} \cdot (1 - P(\text{hit}))}{T_{\text{target latency}}} $$
 
 If the model relies on a few heavily used "shared" experts, $P(\text{hit})$ often exceeds $95\%$. 
 With $P(\text{hit}) = 0.95$:
