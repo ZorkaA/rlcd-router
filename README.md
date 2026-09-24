@@ -63,18 +63,20 @@ Can this run a 1T parameter MoE on an SSD at 4-6 tok/sec? **Yes, but bound by ac
 A 1T parameter MoE is highly sparse. Suppose it has **20B active parameters per token**. 
 At FP16 precision (2 bytes/param), the model requires exactly **40 GB of weights per token**. 
 
-If we target **5 tokens/sec**, the system requires $40 \text{ GB} \times 5 = \textbf{200 GB/s}$ of effective weight bandwidth. 
+If we target **5 tokens/sec**, the system requires $40 \text{ GB} \times 5 = \mathbf{200 \text{ GB/s}}$ of effective weight bandwidth. 
 No SSD in the world can sustain 200 GB/s (PCIe Gen 5 peaks at ~14 GB/s). 
 
 **How does the math work then?**
 The solution is the **LRU Cache (Resident Memory)**. In large MoEs, experts exhibit massive temporal locality (the same experts are used repeatedly for the same context). Let $P(\text{hit})$ be the probability that an active expert is already in the Resident Unified Memory cache (e.g., a 40GB RAM allocation).
 
 The required SSD bandwidth $B_{ssd}$ becomes:
-$$ B_{ssd} = \frac{N_{active} \cdot \text{Bytes} \cdot (1 - P(\text{hit}))}{T_{target\_latency}} $$
+
+$$ B_{ssd} = \frac{N_{active} \cdot \text{Bytes} \cdot (1 - P(\text{hit}))}{T_{\text{target\_latency}}} $$
 
 If the model relies on a few heavily used "shared" experts, $P(\text{hit})$ often exceeds $95\%$. 
 With $P(\text{hit}) = 0.95$:
-$$ B_{ssd} = 200 \text{ GB/s} \times 0.05 = \textbf{10 GB/s} $$
+
+$$ B_{ssd} = 200 \text{ GB/s} \times 0.05 = \mathbf{10 \text{ GB/s}} $$
 
 This is well within the bandwidth of a high-end NVMe RAID or PCIe Gen 5 SSD. The RLCD head's job is to read the remaining $5\%$ from the SSD *before* the GPU needs them, entirely hiding the 10 GB/s I/O latency.
 
