@@ -6,3 +6,5 @@ checkpoints/
 data/
 *.safetensors
 .build/
+/.agents
+/partitioned_experts

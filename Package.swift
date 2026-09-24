@@ -11,6 +11,7 @@ let package = Package(
             name: "AsyncMoERouter",
             targets: ["AsyncMoERouter"]
         ),
+        .executable(name: "BenchmarkE2E", targets: ["BenchmarkE2E"])
     ],
     dependencies: [],
     targets: [
@@ -18,6 +19,11 @@ let package = Package(
             name: "AsyncMoERouter",
             dependencies: [],
             path: "Sources/AsyncMoERouter"
+        ),
+        .executableTarget(
+            name: "BenchmarkE2E",
+            dependencies: ["AsyncMoERouter"],
+            path: "Sources/BenchmarkE2E"
         ),
         .testTarget(
             name: "AsyncMoERouterTests",

@@ -1,0 +1,71 @@
+{
+  "pipeline_config": {
+    "synthetic": true,
+    "device": "mps"
+  },
+  "phases": {
+    "data": {
+      "train_samples": 128,
+      "calib_samples": 32,
+      "mode": "synthetic"
+    },
+    "training": {
+      "mode": "synthetic",
+      "epochs": 2
+    },
+    "calibration": {
+      "mode": "synthetic",
+      "calibrated_probs_shape": [
+        32,
+        3,
+        4,
+        16
+      ]
+    },
+    "evaluation": {
+      "targeted_ece_0.05": {
+        "early|T+1": 0.1988694705069065,
+        "early|T+2": 0.20257456600666046,
+        "early|T+3": 0.19974995777010918,
+        "late|T+1": 0.0,
+        "late|T+2": 0.0,
+        "late|T+3": 0.0
+      },
+      "targeted_ece_0.85": {
+        "early|T+1": 0.0,
+        "early|T+2": 0.0,
+        "early|T+3": 0.0,
+        "late|T+1": 0.0,
+        "late|T+2": 0.0,
+        "late|T+3": 0.0
+      },
+      "cumulative_mass_0.85_stats": {
+        "mean": 0.2508013844490051,
+        "std": 0.06714417040348053,
+        "min": 0.10451865196228027,
+        "max": 0.4954485297203064,
+        "fraction_above_0.85": 0.0,
+        "num_samples": 384
+      },
+      "overall_ece": 0.18750000345789886
+    }
+  },
+  "timings": {
+    "data_phase_seconds": 0.560859203338623,
+    "training_phase_seconds": 1.9247918128967285,
+    "calibration_phase_seconds": 0.19313311576843262,
+    "evaluation_phase_seconds": 0.3091890811920166,
+    "total_seconds": 3.007195234298706
+  },
+  "memory_profile": {
+    "label": "evaluation_phase",
+    "rss_delta_mb": 3.5625,
+    "tracemalloc_delta_bytes": 19265,
+    "tensor_delta": 0,
+    "peak_traced_mb": 1.5687665939331055,
+    "tensor_count_start": 13,
+    "tensor_count_end": 13,
+    "passed_assertions": true,
+    "assertion_errors": []
+  }
+}

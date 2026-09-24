@@ -434,9 +434,12 @@ def run_pipeline(
             calib_data, model, config, resolved_device
         )
     else:
-        from src.calibration.lbfgs_optimizer import LBFGSTemperatureOptimizer
+        from src.calibration.lbfgs_optimizer import LBFGSOptimizer
+        from src.calibration.grid import TemperatureGrid
         
-        optimizer = LBFGSTemperatureOptimizer(
+        grid = TemperatureGrid()
+        optimizer = LBFGSOptimizer(
+            temperature_grid=grid,
             config=config.calibration,
             device=resolved_device,
         )
@@ -444,12 +447,12 @@ def run_pipeline(
         # But wait, grid optimization takes the model and the calibration data.
         with torch.inference_mode():
             calib_hs = calib_data["hidden_states"].to(resolved_device)
-            # The speculative head expects (N, 2048) and returns (N, H, L, E)
+            # The speculative head expects (N, hidden_size) and returns (N, H, L, E)
             spec_logits = model(calib_hs)
             
         # Optimize temperatures
-        grid = optimizer.fit(
-            unscaled_logits=spec_logits,
+        optimizer.fit(
+            speculative_logits=spec_logits,
             target_router_logits=calib_data["target_router_logits"].to(resolved_device),
         )
         # Calculate calibrated probabilities
