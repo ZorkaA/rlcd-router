@@ -44,7 +44,9 @@ Post-training, we optimize the logits $\hat{z}$ using Negative Log-Likelihood (N
 
 $$ \hat{p}_i = \frac{\exp(\hat{z}_i / T)}{\sum_j \exp(\hat{z}_j / T)} $$
 
-We evaluate this calibration using the **Brier Score**, measuring the mean squared difference between predicted probabilities $\hat{p}_{ic}$ and the ground truth one-hot labels $y_{ic}$:
+We evaluate this calibration using the **Brier Score**, measuring the mean squared difference 
+between predicted probabilities $\hat{p}_{ic}$ 
+and the ground truth one-hot labels $y_{ic}$:
 
 $$ BS = \frac{1}{N} \sum_{i=1}^N \sum_{c=1}^C (\hat{p}_{ic} - y_{ic})^2 $$
 
