@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-rlcd",
+  "object": "chat.completion",
+  "created": 1790842852,
+  "model": "mlx-community/Qwen1.5-MoE-A2.7B-Chat-4bit",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "1. Neural networks are a type of machine learning model inspired by the structure and function of the human brain.\n  2. They consist of layers of interconnected \"neurons\" that process and transmit information.\n  3. Each neuron receives input from other neurons, processes it, and produces output to other neurons.\n  4. Neural networks are trained using large amounts of data to learn patterns and relationships in the data.\n  5. They are used for a variety of tasks, such as image recognition, natural language processing, and predictive analytics.\n  6. The more layers a neural network has, the more complex the patterns it can learn, but also the more data and computational power it requires.\n  7. Neural networks"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 19,
+    "completion_tokens": 150,
+    "total_tokens": 169
+  },
+  "metrics": {
+    "ttft": 0.368074893951416,
+    "total_time": 3.2728378772735596,
+    "tokens_per_second": 45.83178440997439,
+    "avg_hit_time": 0.016092459360758465,
+    "avg_miss_time": 0.019474005045956127,
+    "hit_count": 3,
+    "miss_count": 146,
+    "hit_tok_sec": 62.140905723739436,
+    "miss_tok_sec": 51.350505334682296,
+    "memory_used_gb": 9.914660461246967
+  }
+}

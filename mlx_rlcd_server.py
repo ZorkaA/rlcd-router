@@ -144,8 +144,8 @@ class Layer3Interceptor:
 @app.on_event("startup")
 async def startup_event():
     global model, tokenizer, spec_head
-    logger.info("Loading model mlx-community/Qwen1.5-MoE-A2.7B-Chat-4bit...")
-    model, tokenizer = load("mlx-community/Qwen1.5-MoE-A2.7B-Chat-4bit")
+    logger.info("Loading model from /Users/jack/Downloads/rlcd-router/real_model_weights...")
+    model, tokenizer = load("/Users/jack/Downloads/rlcd-router/real_model_weights")
     
     logger.info("Initializing Medusa Speculative Head for Qwen...")
     try:

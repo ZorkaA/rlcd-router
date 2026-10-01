@@ -1,0 +1,94 @@
+[transformers] Disabling PyTorch because PyTorch >= 2.5 is required but found 2.2.2
+mx.metal.set_cache_limit is deprecated and will be removed in a future version. Use mx.set_cache_limit instead.
+/Users/jack/Downloads/rlcd-router/mlx_rlcd_server.py:94: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [3391]
+INFO:     Waiting for application startup.
+INFO:__main__:Loading model Qwen/Qwen1.5-MoE-A2.7B...
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen1.5-MoE-A2.7B/revision/main "HTTP/1.1 200 OK"
+Fetching 16 files:   0%|          | 0/16 [00:00<?, ?it/s]Fetching 16 files: 100%|██████████| 16/16 [00:00<00:00, 4031.29it/s]
+INFO:__main__:Initializing Medusa Speculative Head for Qwen...
+INFO:src.models.medusa_head:Initialising MedusaSpeculativeHead: input_dim=2048, num_horizons=3, num_deep_layers=20, num_experts=60, output_dim_per_horizon=1200
+INFO:__main__:Medusa head initialized.
+INFO:__main__:Injecting dynamic prefetcher interceptor at layer 3...
+INFO:__main__:Model loaded successfully.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:__main__:Received request for prompt: user: Write a short poem about coding.
+assistant: 
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+mx.metal.get_active_memory is deprecated and will be removed in a future version. Use mx.get_active_memory instead.
+INFO:__main__:Completed generation in 50.91s, tokens: 29
+[WARNING] Generating with a model that requires 26216 MB which is close to the maximum recommended size of 28753 MB. This can be slow. See the documentation for possible work-arounds: https://github.com/ml-explore/mlx-lm/tree/main#large-models
+INFO:     127.0.0.1:50051 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:__main__:Received request for prompt: user: Write a short poem about coding.
+assistant: 
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+ERROR:__main__:Error in prefetch thread: 'bfloat16' is not a valid PEP 3118 buffer format string
+INFO:__main__:Completed generation in 428.92s, tokens: 29
+[WARNING] Generating with a model that requires 26216 MB which is close to the maximum recommended size of 28753 MB. This can be slow. See the documentation for possible work-arounds: https://github.com/ml-explore/mlx-lm/tree/main#large-models
+INFO:     127.0.0.1:50106 - "POST /v1/chat/completions HTTP/1.1" 200 OK

@@ -1,0 +1,33 @@
+[transformers] Disabling PyTorch because PyTorch >= 2.5 is required but found 2.2.2
+mx.metal.set_cache_limit is deprecated and will be removed in a future version. Use mx.set_cache_limit instead.
+/Users/jack/Downloads/rlcd-router/real_rlcd_server.py:27: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [27964]
+INFO:     Waiting for application startup.
+INFO:__main__:Loading model Qwen/Qwen1.5-MoE-A2.7B...
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen1.5-MoE-A2.7B/revision/main "HTTP/1.1 200 OK"
+Fetching 16 files:   0%|          | 0/16 [00:00<?, ?it/s]INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00005-of-00008.safetensors "HTTP/1.1 302 Found"
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/models/Qwen/Qwen1.5-MoE-A2.7B/xet-read-token/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00003-of-00008.safetensors "HTTP/1.1 302 Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00006-of-00008.safetensors "HTTP/1.1 302 Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00008-of-00008.safetensors "HTTP/1.1 302 Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00002-of-00008.safetensors "HTTP/1.1 302 Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00004-of-00008.safetensors "HTTP/1.1 302 Found"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model-00007-of-00008.safetensors "HTTP/1.1 302 Found"
+Fetching 16 files:  31%|███▏      | 5/16 [01:59<04:22, 23.86s/it]INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model.safetensors.index.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen1.5-MoE-A2.7B/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/model.safetensors.index.json?%2FQwen%2FQwen1.5-MoE-A2.7B%2Fresolve%2F1a758c50ecb6350748b9ce0a99d2352fd9fc11c9%2Fmodel.safetensors.index.json=&etag=%228058add31525101e7da55a6e62fcb6dae493114d%22 "HTTP/1.1 200 OK"
+Fetching 16 files:  38%|███▊      | 6/16 [02:00<03:08, 18.82s/it]INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/tokenizer.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen1.5-MoE-A2.7B/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/tokenizer.json?%2FQwen%2FQwen1.5-MoE-A2.7B%2Fresolve%2F1a758c50ecb6350748b9ce0a99d2352fd9fc11c9%2Ftokenizer.json=&etag=%2233ea6c72ebb92a237fa2bdf26c5ff16592efcdae%22 "HTTP/1.1 200 OK"
+Fetching 16 files:  44%|████▍     | 7/16 [02:01<02:11, 14.59s/it]INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen1.5-MoE-A2.7B/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/tokenizer_config.json?%2FQwen%2FQwen1.5-MoE-A2.7B%2Fresolve%2F1a758c50ecb6350748b9ce0a99d2352fd9fc11c9%2Ftokenizer_config.json=&etag=%22c30ea5ba8d46126caa255160308702aeef70d75e%22 "HTTP/1.1 200 OK"
+Fetching 16 files:  50%|█████     | 8/16 [02:02<01:27, 10.97s/it]INFO:httpx:HTTP Request: HEAD https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/resolve/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/vocab.json "HTTP/1.1 307 Temporary Redirect"
+INFO:httpx:HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Qwen/Qwen1.5-MoE-A2.7B/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/vocab.json?%2FQwen%2FQwen1.5-MoE-A2.7B%2Fresolve%2F1a758c50ecb6350748b9ce0a99d2352fd9fc11c9%2Fvocab.json=&etag=%224783fe10ac3adce15ac8f358ef5462739852c569%22 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Qwen/Qwen1.5-MoE-A2.7B/1a758c50ecb6350748b9ce0a99d2352fd9fc11c9/vocab.json?%2FQwen%2FQwen1.5-MoE-A2.7B%2Fresolve%2F1a758c50ecb6350748b9ce0a99d2352fd9fc11c9%2Fvocab.json=&etag=%224783fe10ac3adce15ac8f358ef5462739852c569%22 "HTTP/1.1 200 OK"
+Fetching 16 files:  56%|█████▋    | 9/16 [02:03<00:57,  8.27s/it]Fetching 16 files:  62%|██████▎   | 10/16 [05:19<06:02, 60.42s/it]Fetching 16 files:  69%|██████▉   | 11/16 [05:28<03:49, 45.84s/it]Fetching 16 files:  75%|███████▌  | 12/16 [05:35<02:18, 34.69s/it]Fetching 16 files:  81%|████████▏ | 13/16 [05:42<01:19, 26.55s/it]Fetching 16 files:  88%|████████▊ | 14/16 [05:45<00:39, 19.52s/it]Fetching 16 files:  94%|█████████▍| 15/16 [05:47<00:14, 14.44s/it]Fetching 16 files: 100%|██████████| 16/16 [05:49<00:00, 10.77s/it]Fetching 16 files: 100%|██████████| 16/16 [05:49<00:00, 21.86s/it]
