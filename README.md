@@ -106,7 +106,7 @@ This project exposes an OpenAI-compatible API that can be used with any standard
 To start the asynchronous compute-in-flash server, run the following in your terminal:
 ```bash
 # Ensure you are in the project root
-cd /Users/jack/Downloads/rlcd-router
+cd /Users/usr/Downloads/rlcd-router
 
 # Start the Fast I/O API server
 python3 mlx_rlcd_server.py
