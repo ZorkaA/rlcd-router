@@ -27,7 +27,17 @@ try:
 except AttributeError:
     pass
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     model: str
@@ -196,6 +206,9 @@ def generate_text_sync(prompt, max_tokens):
             
     return "".join(tokens), len(tokens), ttft, hit_times, miss_times
 
+from fastapi.responses import StreamingResponse
+import json
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
     start_time = time.time()
@@ -210,50 +223,114 @@ async def chat_completions(request: ChatRequest):
 
     logger.info(f"Received request for prompt:\n{prompt}")
     
-    # Run generation in a separate thread so it doesn't block the event loop
-    output_text, num_tokens, ttft, hit_times, miss_times = await asyncio.to_thread(generate_text_sync, prompt, request.max_tokens)
-    
-    # Prepend the injected <think> tag to the output text
-    output_text = "<think>\n" + output_text
-    
-    total_time = time.time() - start_time
-    
-    avg_hit_time = sum(hit_times) / len(hit_times) if hit_times else 0
-    avg_miss_time = sum(miss_times) / len(miss_times) if miss_times else 0
+    if request.stream:
+        async def event_generator():
+            request_local.current_token_was_miss = False
+            first = True
+            
+            chunk_id = f"chatcmpl-rlcd-{int(time.time())}"
+            
+            def create_chunk(delta_content, role="assistant"):
+                delta = {"content": delta_content}
+                if role is not None:
+                    delta["role"] = role
+                return {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": request.model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": delta,
+                        "finish_reason": None
+                    }]
+                }
+            
+            chunk_str = json.dumps(create_chunk("<think>\\n", role="assistant"))
+            yield f"data: {chunk_str}\n\n"
+            
+            for response in stream_generate(model, tokenizer, prompt=prompt, max_tokens=request.max_tokens):
+                text = response.text if hasattr(response, 'text') else str(response)
+                chunk_str2 = json.dumps(create_chunk(text, role=None))
+                yield f"data: {chunk_str2}\n\n"
+                await asyncio.sleep(0)
+                
+            final_chunk = {
+                "id": chunk_id,
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": "stop"
+                }]
+            }
+            final_chunk_str = json.dumps(final_chunk)
+            yield f"data: {final_chunk_str}\n\n"
+            yield "data: [DONE]\n\n"
 
-    response_data = {
-        "id": "chatcmpl-rlcd",
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": request.model,
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": output_text
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+    else:
+        # Run generation in a separate thread so it doesn't block the event loop
+        output_text, num_tokens, ttft, hit_times, miss_times = await asyncio.to_thread(generate_text_sync, prompt, request.max_tokens)
+        
+        # Prepend the injected <think> tag to the output text
+        output_text = "<think>\n" + output_text
+        
+        total_time = time.time() - start_time
+        
+        avg_hit_time = sum(hit_times) / len(hit_times) if hit_times else 0
+        avg_miss_time = sum(miss_times) / len(miss_times) if miss_times else 0
+
+        response_data = {
+            "id": f"chatcmpl-rlcd-{int(time.time())}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": request.model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": output_text
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": len(tokenizer.encode(prompt)),
+                "completion_tokens": num_tokens,
+                "total_tokens": len(tokenizer.encode(prompt)) + num_tokens
             },
-            "finish_reason": "stop"
-        }],
-        "usage": {
-            "prompt_tokens": len(tokenizer.encode(prompt)),
-            "completion_tokens": num_tokens,
-            "total_tokens": len(tokenizer.encode(prompt)) + num_tokens
-        },
-        "metrics": {
-            "ttft": ttft,
-            "total_time": total_time,
-            "tokens_per_second": num_tokens / total_time if total_time > 0 else 0,
-            "avg_hit_time": avg_hit_time,
-            "avg_miss_time": avg_miss_time,
-            "hit_count": len(hit_times),
-            "miss_count": len(miss_times),
-            "hit_tok_sec": 1.0 / avg_hit_time if avg_hit_time > 0 else 0,
-            "miss_tok_sec": 1.0 / avg_miss_time if avg_miss_time > 0 else 0,
-            "memory_used_gb": (mx.get_active_memory() if hasattr(mx, 'get_active_memory') else mx.metal.get_active_memory()) / (1024**3),
+            "metrics": {
+                "ttft": ttft,
+                "total_time": total_time,
+                "tokens_per_second": num_tokens / total_time if total_time > 0 else 0,
+                "avg_hit_time": avg_hit_time,
+                "avg_miss_time": avg_miss_time,
+                "hit_count": len(hit_times),
+                "miss_count": len(miss_times),
+                "hit_tok_sec": 1.0 / avg_hit_time if avg_hit_time > 0 else 0,
+                "miss_tok_sec": 1.0 / avg_miss_time if avg_miss_time > 0 else 0,
+                "memory_used_gb": (mx.get_active_memory() if hasattr(mx, 'get_active_memory') else mx.metal.get_active_memory()) / (1024**3) if hasattr(mx, 'metal') or hasattr(mx, 'get_active_memory') else 0,
+            }
         }
+        logger.info(f"Completed generation in {total_time:.2f}s, tokens: {num_tokens}")
+        return response_data
+
+@app.get("/v1/models")
+@app.get("/v1/models/")
+async def get_models():
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "DeepSeek-V4.1-Flash",
+                "object": "model",
+                "created": 1700000000,
+                "owned_by": "rlcd"
+            }
+        ]
     }
-    logger.info(f"Completed generation in {total_time:.2f}s, tokens: {num_tokens}")
-    return response_data
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8081)
