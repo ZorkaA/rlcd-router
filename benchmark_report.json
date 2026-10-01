@@ -1,0 +1,9 @@
+{
+    "model": "Mixtral-8x22B (Simulated)",
+    "memory_budget_gb": 30.6,
+    "metrics": {
+        "baseline_tok_sec": 0.74,
+        "rlcd_tok_sec": 0.63,
+        "speedup": 0.85
+    }
+}

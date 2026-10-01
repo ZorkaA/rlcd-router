@@ -75,6 +75,21 @@ public struct MoEArchitectureConfig: Sendable, Equatable {
     /// Production preset corresponding to Qwen/Qwen1.5-MoE-A2.7B.
     public static let qwen15MoEA27B = MoEArchitectureConfig()
 
+    /// Frontier model Mixtral 8x22B configuration.
+    public static let mixtral8x22B = MoEArchitectureConfig(
+        hiddenSize: 14336,
+        intermediateSize: 16384,
+        numTotalLayers: 56,
+        numDeepLayers: 56,
+        deepLayerStart: 0,
+        earlyLayerRange: 0...10,
+        lateLayerRange: 11...55,
+        numExperts: 8,
+        numActiveExperts: 2,
+        numHorizons: 3,
+        bytesPerElement: 2
+    )
+
     /// Lightweight synthetic preset for rapid CI testing and offline verification.
     /// Expert size: 3 * 64 * 64 * 2 = 24,576 bytes (24 KB).
     public static let synthetic = MoEArchitectureConfig(

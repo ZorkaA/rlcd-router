@@ -1,0 +1,11 @@
+Starting E2E Benchmark...
+Running benchmark loop for 100 tokens...
+Benchmark finished: 0.63 tok/sec
+[Pipeline Diagnostics]
+  Tokens processed: 100
+  Cache hits: 0 (0.0%)
+  Cache misses: 100
+  Aborts: 0
+  Ring buffer: 16 slots
+  Fallback pool: 0 in use, 4 free
+  LRU tracker: 0 resident experts

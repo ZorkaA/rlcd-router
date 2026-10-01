@@ -45,6 +45,16 @@ public struct WeightLayoutConfig: Sendable, Equatable {
     /// Production configuration matching Qwen/Qwen1.5-MoE-A2.7B
     public static let qwen15MoEA27B = WeightLayoutConfig()
 
+    /// Frontier model Mixtral 8x22B layout configuration
+    public static let mixtral8x22B = WeightLayoutConfig(
+        hiddenSize: 14336,
+        intermediateSize: 16384,
+        numExperts: 8,
+        numLayers: 56,
+        bytesPerElement: 2,
+        pageAlignment: 16_384
+    )
+
     /// Synthetic configuration for fast CI/CD and unit testing
     public static let synthetic = WeightLayoutConfig(
         hiddenSize: 64,
