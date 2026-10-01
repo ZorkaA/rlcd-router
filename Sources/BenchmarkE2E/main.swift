@@ -32,14 +32,14 @@ struct BenchmarkE2E {
             budgetConfig: budgetConfig
         )
         
-        let expertsDir = URL(fileURLWithPath: "/Volumes/SSK SSD/partitioned_experts")
+        let expertsDir = URL(fileURLWithPath: "/Users/jack/Downloads/rlcd-router/partitioned_experts")
         guard FileManager.default.fileExists(atPath: expertsDir.path) else {
             fatalError("Partitioned experts directory not found. Please run scripts/partition_model.py first.")
         }
         
         let files = try FileManager.default.contentsOfDirectory(atPath: expertsDir.path)
-        guard let firstExpertFile = files.first(where: { $0 == "mixtral_dummy.bin" }) else {
-            fatalError("mixtral_dummy.bin not found in partitioned_experts")
+        guard let firstExpertFile = files.first(where: { $0 == "expert_0.bin" }) else {
+            fatalError("expert_0.bin not found in partitioned_experts")
         }
         let firstExpertURL = expertsDir.appendingPathComponent(firstExpertFile)
         

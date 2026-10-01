@@ -1,15 +1,10 @@
-import requests
-import json
+from mlx_lm import load, stream_generate
 
-url = "http://127.0.0.1:8081/v1/chat/completions"
-data = {
-    "model": "DeepSeek-V4.1-Flash",
-    "messages": [{"role": "user", "content": "Explain quantum computing."}],
-    "max_tokens": 5,
-    "stream": True,
-    "extended_reasoning": True
-}
-response = requests.post(url, json=data, stream=True)
-for line in response.iter_lines():
-    if line:
-        print(line.decode('utf-8'))
+try:
+    model, tokenizer = load("mlx-community/Qwen2.5-0.5B-Instruct-4bit")
+    prompt = "What is 2+2? Answer in one word."
+
+    for response in stream_generate(model, tokenizer, prompt=prompt, max_tokens=10):
+        print("YIELDED TEXT:", repr(response.text))
+except Exception as e:
+    print(e)

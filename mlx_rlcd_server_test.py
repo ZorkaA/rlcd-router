@@ -155,8 +155,8 @@ class Layer3Interceptor:
 @app.on_event("startup")
 async def startup_event():
     global model, tokenizer, spec_head
-    logger.info("Loading model from /Users/jack/Downloads/rlcd-router/real_model_weights...")
-    model, tokenizer = load("/Users/jack/Downloads/rlcd-router/real_model_weights")
+    logger.info("Loading model from mlx-community/Qwen2.5-0.5B-Instruct-4bit...")
+    model, tokenizer = load("mlx-community/Qwen2.5-0.5B-Instruct-4bit")
     
     logger.info("Initializing Medusa Speculative Head for Qwen...")
     try:
@@ -172,8 +172,8 @@ async def startup_event():
         logger.error(f"Failed to load speculative head: {e}")
         
     if hasattr(model, "model") and hasattr(model.model, "layers") and len(model.model.layers) > 3:
-        logger.info("Skipping dynamic prefetcher interceptor for testing...")
-        # model.model.layers[3] = Layer3Interceptor(model.model.layers[3])
+        logger.info("Injecting dynamic prefetcher interceptor at layer 3...")
+        model.model.layers[3] = Layer3Interceptor(model.model.layers[3])
         
     logger.info("Model loaded successfully.")
 
@@ -201,27 +201,26 @@ def generate_text_sync(prompt, max_tokens):
         start_time = time.time()
         
         current_text = response.text if hasattr(response, 'text') else str(response)
-        tokens.append(current_text)
+        
+        # Robustly extract delta
+        previous_text = "".join(tokens)
+        if len(previous_text) > 0 and current_text.startswith(previous_text):
+            delta_text = current_text[len(previous_text):]
+        else:
+            delta_text = current_text
+            
+        tokens.append(delta_text)
         
         # Ensure EOS properly breaks
         if getattr(response, "finish_reason", None) is not None:
             break
         
         if hasattr(response, "token"):
-            eos_ids = set()
-            if getattr(tokenizer, "eos_token_id", None) is not None:
-                eos_ids.add(tokenizer.eos_token_id)
-            if getattr(tokenizer, "eos_token_ids", None) is not None:
-                if isinstance(tokenizer.eos_token_ids, (list, set)):
-                    eos_ids.update(tokenizer.eos_token_ids)
-            
-            # Add <|im_end|> manually since some tokenizers lack it in eos_token_ids
-            if hasattr(tokenizer, "convert_tokens_to_ids"):
-                im_end_id = tokenizer.convert_tokens_to_ids("<|im_end|>")
-                if im_end_id is not None and (not hasattr(tokenizer, "unk_token_id") or im_end_id != tokenizer.unk_token_id):
-                    eos_ids.add(im_end_id)
-            
-            if response.token in eos_ids:
+            eos_id = getattr(tokenizer, "eos_token_id", None)
+            eos_ids = getattr(tokenizer, "eos_token_ids", [])
+            if eos_id is not None and response.token == eos_id:
+                break
+            if eos_ids and response.token in eos_ids:
                 break
             
     return "".join(tokens), len(tokens), ttft, hit_times, miss_times
@@ -233,14 +232,15 @@ import json
 async def chat_completions(request: ChatRequest):
     start_time = time.time()
     
-    messages = request.messages
+    system_msg = {"role": "system", "content": "You are a helpful AI assistant. Always use extended reasoning. Enclose your reasoning in <think>...</think> tags before your final answer."}
     
-    prompt = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True)
-    prompt_length = len(tokenizer.encode(prompt)) if isinstance(prompt, str) else len(prompt)
+    # Filter out existing system messages to avoid duplication
+    messages = [system_msg] + [msg for msg in request.messages if msg['role'] != 'system']
+    
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
-    log_prompt = tokenizer.decode(prompt) if isinstance(prompt, list) else prompt
-    logger.info(f"Received request for messages: {messages}\nPrompt:\n{log_prompt}\nPROMPT TYPE: {type(prompt)}")
+    logger.info(f"Received request for prompt:\n{prompt}")
     
     if request.stream:
         async def event_generator():
@@ -272,15 +272,24 @@ async def chat_completions(request: ChatRequest):
                     chunk["usage"] = None
                 return chunk
             
-            chunk_str = json.dumps(create_chunk("", role="assistant"))
+            chunk_str = json.dumps(create_chunk("<think>\n", role="assistant"))
             yield f"data: {chunk_str}\n\n"
             
             num_tokens = 0
+            previous_text = ""
             for response in stream_generate(model, tokenizer, prompt=prompt, max_tokens=request.max_tokens):
                 current_text = response.text if hasattr(response, 'text') else str(response)
                 
+                # Robustly extract delta in case generator yields accumulated text
+                if len(previous_text) > 0 and current_text.startswith(previous_text):
+                    delta_text = current_text[len(previous_text):]
+                    previous_text = current_text
+                else:
+                    delta_text = current_text
+                    previous_text += current_text
+                
                 num_tokens += 1
-                chunk_str2 = json.dumps(create_chunk(current_text, role=None))
+                chunk_str2 = json.dumps(create_chunk(delta_text, role=None))
                 yield f"data: {chunk_str2}\n\n"
                 await asyncio.sleep(0)
                 
@@ -289,19 +298,12 @@ async def chat_completions(request: ChatRequest):
                     break
                 
                 if hasattr(response, "token"):
-                    eos_ids = set()
-                    if getattr(tokenizer, "eos_token_id", None) is not None:
-                        eos_ids.add(tokenizer.eos_token_id)
-                    if getattr(tokenizer, "eos_token_ids", None) is not None:
-                        if isinstance(tokenizer.eos_token_ids, (list, set)):
-                            eos_ids.update(tokenizer.eos_token_ids)
-                    
-                    if hasattr(tokenizer, "convert_tokens_to_ids"):
-                        im_end_id = tokenizer.convert_tokens_to_ids("<|im_end|>")
-                        if im_end_id is not None and (not hasattr(tokenizer, "unk_token_id") or im_end_id != tokenizer.unk_token_id):
-                            eos_ids.add(im_end_id)
-                    
-                    if response.token in eos_ids:
+                    # Check eos_token_id
+                    eos_id = getattr(tokenizer, "eos_token_id", None)
+                    eos_ids = getattr(tokenizer, "eos_token_ids", [])
+                    if eos_id is not None and response.token == eos_id:
+                        break
+                    if eos_ids and response.token in eos_ids:
                         break
 
                 
@@ -329,9 +331,9 @@ async def chat_completions(request: ChatRequest):
                     "model": request.model,
                     "choices": [],
                     "usage": {
-                        "prompt_tokens": prompt_length,
+                        "prompt_tokens": len(tokenizer.encode(prompt)),
                         "completion_tokens": num_tokens,
-                        "total_tokens": prompt_length + num_tokens
+                        "total_tokens": len(tokenizer.encode(prompt)) + num_tokens
                     }
                 }
                 yield f"data: {json.dumps(usage_chunk)}\n\n"
@@ -343,7 +345,8 @@ async def chat_completions(request: ChatRequest):
         # Run generation in a separate thread so it doesn't block the event loop
         output_text, num_tokens, ttft, hit_times, miss_times = await asyncio.to_thread(generate_text_sync, prompt, request.max_tokens)
         
-        # Removed the injected <think> tag
+        # Prepend the injected <think> tag to the output text
+        output_text = "<think>\n" + output_text
         
         total_time = time.time() - start_time
         
@@ -364,9 +367,9 @@ async def chat_completions(request: ChatRequest):
                 "finish_reason": "stop"
             }],
             "usage": {
-                "prompt_tokens": prompt_length,
+                "prompt_tokens": len(tokenizer.encode(prompt)),
                 "completion_tokens": num_tokens,
-                "total_tokens": prompt_length + num_tokens
+                "total_tokens": len(tokenizer.encode(prompt)) + num_tokens
             },
             "metrics": {
                 "ttft": ttft,
@@ -400,4 +403,4 @@ async def get_models():
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8081)
+    uvicorn.run(app, host="127.0.0.1", port=8082)
