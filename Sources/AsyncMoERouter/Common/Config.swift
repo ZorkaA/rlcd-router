@@ -90,6 +90,21 @@ public struct MoEArchitectureConfig: Sendable, Equatable {
         bytesPerElement: 2
     )
 
+    /// Mixtral 8x7B configuration.
+    public static let mixtral8x7B = MoEArchitectureConfig(
+        hiddenSize: 4096,
+        intermediateSize: 14336,
+        numTotalLayers: 32,
+        numDeepLayers: 32,
+        deepLayerStart: 0,
+        earlyLayerRange: 0...10,
+        lateLayerRange: 11...31,
+        numExperts: 8,
+        numActiveExperts: 2,
+        numHorizons: 3,
+        bytesPerElement: 2
+    )
+
     /// Lightweight synthetic preset for rapid CI testing and offline verification.
     /// Expert size: 3 * 64 * 64 * 2 = 24,576 bytes (24 KB).
     public static let synthetic = MoEArchitectureConfig(

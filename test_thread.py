@@ -2,6 +2,7 @@ import threading
 import mlx.core as mx
 
 def run():
-    print(mx.default_stream(mx.default_device()))
-    
+    mx.eval(mx.array([1, 2, 3]))
+    print('success')
+
 threading.Thread(target=run).start()

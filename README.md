@@ -109,7 +109,7 @@ To start the asynchronous compute-in-flash server, run the following in your ter
 cd /Users/usr/Downloads/rlcd-router
 
 # Start the Fast I/O API server
-python3 mlx_rlcd_server.py
+python3 flash_server.py
 ```
 *(Note: Do not use standard `mlx_lm` loading scripts for the heavyweight models, as they will attempt to map all 47GB+ into your RAM and instantly crash the OS. `mlx_rlcd_server.py` explicitly handles bounded I/O paging.)*
 

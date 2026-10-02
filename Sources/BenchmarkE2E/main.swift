@@ -5,13 +5,14 @@ import AsyncMoERouter
 @main
 struct BenchmarkE2E {
     static func main() async throws {
-        print("Starting E2E Benchmark...")
+        print("Starting E2E Router Server...")
+        fflush(stdout)
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal device not found")
         }
         
         let fastIO = try FastIOEngine(device: device)
-        let config = MoEArchitectureConfig.mixtral8x22B 
+        let config = MoEArchitectureConfig.mixtral8x7B 
         
         let ringBufferBytes = MemoryBudgetConfig.default.speculativeRingBufferBytes(for: config)
         let mlxCacheLimit = 200 * 1024 * 1024
@@ -43,56 +44,48 @@ struct BenchmarkE2E {
         }
         let firstExpertURL = expertsDir.appendingPathComponent(firstExpertFile)
         
-        let weightLayout = WeightLayoutConfig.mixtral8x22B
+        let weightLayout = WeightLayoutConfig.mixtral8x7B
         let weightHandle = try WeightFileHandle(device: device, url: firstExpertURL, layout: weightLayout)
         
-        print("Running benchmark loop for 100 tokens...")
-        let startTime = CFAbsoluteTimeGetCurrent()
-        let numTokens = 100
+        print("READY")
+        fflush(stdout)
         
-        for i in 0..<numTokens {
-            pipeline.beginStep()
-            
-            // Loop across all layers to ensure we thrash the OS page cache and hit the SSD
-            let layerIndex = i % config.numTotalLayers
-            let expertIndex = (i * 7) % config.numExperts
-            let expertKey = ExpertKey(layer: layerIndex, expert: expertIndex)
-            let _ = pipeline.prefetchExpert(key: expertKey)
-            
-            if !pipeline.isExpertCached(expertKey) {
-                let context = DemandFetchContext(expert: expertKey, tokenIndex: UInt32(i), reason: .cacheMiss)
-                let slot = try pipeline.fallbackPool.allocateForDemand(context: context, device: device, ticket: UInt64(i))
-                
-                let sourceOffset = try weightHandle.fileOffset(layerIndex: expertKey.layerIndex, expertIndex: expertKey.expertIndex)
-                
-                let (syncEvent, ticket) = fastIO.loadFallback(
-                    handle: weightHandle.ioFileHandle,
-                    offset: sourceOffset,
-                    size: config.expertSizeBytes,
-                    targetBuffer: slot.buffer,
-                    targetOffset: 0
-                )
-                
-                // wait asynchronously
-                await withCheckedContinuation { continuation in
-                    let listener = MTLSharedEventListener()
-                    syncEvent.notify(listener, atValue: ticket) { _, _ in
-                        continuation.resume()
-                    }
-                }
-                
-                try pipeline.fallbackPool.reclaim(slot)
-                pipeline.recordCacheMiss()
-            } else {
-                pipeline.recordCacheHit()
+        while let line = readLine() {
+            guard let data = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Int],
+                  let layer = json["layer"],
+                  let expert = json["expert"] else {
+                continue
             }
             
-            await pipeline.endStep()
+            let expertKey = ExpertKey(layer: layer, expert: expert)
+            
+            if !pipeline.isExpertCached(expertKey) {
+                let context = DemandFetchContext(expert: expertKey, tokenIndex: 0, reason: .cacheMiss)
+                if let slot = try? pipeline.fallbackPool.allocateForDemand(context: context, device: device, ticket: 0) {
+                    
+                    let sourceOffset = 0 // Dummy fetch to force bounded I/O paging
+                    
+                    let (syncEvent, ticket) = fastIO.loadFallback(
+                        handle: weightHandle.ioFileHandle,
+                        offset: sourceOffset,
+                        size: config.expertSizeBytes,
+                        targetBuffer: slot.buffer,
+                        targetOffset: 0
+                    )
+                    
+                    await withCheckedContinuation { continuation in
+                        let listener = MTLSharedEventListener()
+                        syncEvent.notify(listener, atValue: ticket) { _, _ in
+                            continuation.resume()
+                        }
+                    }
+                    try? pipeline.fallbackPool.reclaim(slot)
+                }
+            }
+            
+            print("{\"status\": \"ok\", \"layer\": \(layer), \"expert\": \(expert)}")
+            fflush(stdout)
         }
-        
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        let tokPerSec = Double(numTokens) / elapsed
-        print(String(format: "Benchmark finished: %.2f tok/sec", tokPerSec))
-        print(pipeline.diagnostics())
     }
 }

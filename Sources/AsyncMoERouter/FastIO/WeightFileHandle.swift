@@ -55,6 +55,16 @@ public struct WeightLayoutConfig: Sendable, Equatable {
         pageAlignment: 16_384
     )
 
+    /// Mixtral 8x7B layout configuration
+    public static let mixtral8x7B = WeightLayoutConfig(
+        hiddenSize: 4096,
+        intermediateSize: 14336,
+        numExperts: 8,
+        numLayers: 32,
+        bytesPerElement: 2,
+        pageAlignment: 16_384
+    )
+
     /// Synthetic configuration for fast CI/CD and unit testing
     public static let synthetic = WeightLayoutConfig(
         hiddenSize: 64,

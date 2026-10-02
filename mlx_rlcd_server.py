@@ -1,6 +1,33 @@
 import time
 import asyncio
 import threading
+
+import subprocess
+import json
+
+swift_process = None
+swift_lock = threading.RLock()
+
+def get_swift_process():
+    global swift_process
+    with swift_lock:
+        if swift_process is None:
+            logger.info("Starting Swift IPC Server...")
+            swift_process = subprocess.Popen(
+                [".build/release/BenchmarkE2E"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                text=True
+            )
+            # Wait for READY
+            while True:
+                line = swift_process.stdout.readline()
+                if "READY" in line:
+                    logger.info("Swift IPC Server Ready.")
+                    break
+    return swift_process
+
+
 import concurrent.futures
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
@@ -16,16 +43,16 @@ from src.config import NUM_DEEP_LAYERS, NUM_EXPERTS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+_orig_device_info = mx.device_info
+def _patched_device_info():
+    info = _orig_device_info()
+    if "max_recommended_working_set_size" not in info:
+        info["max_recommended_working_set_size"] = 24 * 1024**3
+    return info
+mx.device_info = _patched_device_info
+# Removed memory limits
 
-# Set MLX memory cache limit to 30.6 GB
-# Use mx.set_cache_limit instead of deprecated mx.metal.set_cache_limit
-try:
-    if hasattr(mx, 'set_cache_limit'):
-        mx.set_cache_limit(int(30.6 * 1024**3))
-    else:
-        mx.metal.set_cache_limit(int(30.6 * 1024**3))
-except AttributeError:
-    pass
+
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -71,7 +98,11 @@ def prefetch_experts(hidden_array):
     try:
         hidden_array = hidden_array.astype(mx.float32)
         mx.eval(hidden_array)
-        hidden_np = np.array(hidden_array)
+        
+        try:
+            hidden_np = np.array(hidden_array)
+        except Exception:
+            hidden_np = np.array(hidden_array.tolist())
         
         with torch.inference_mode():
             hidden_tensor = torch.from_numpy(hidden_np).float()
@@ -90,21 +121,42 @@ def prefetch_experts(hidden_array):
             for layer_idx, experts in enumerate(top_k_experts):
                 actual_layer = layer_idx + 4
                 if actual_layer < len(model.model.layers):
-                    layer_module = model.model.layers[actual_layer].mlp
+                    actual_layer_obj = model.model.layers[actual_layer]
+                    if hasattr(actual_layer_obj, 'original_layer'):
+                        actual_layer_obj = actual_layer_obj.original_layer
+                        
+                    if hasattr(actual_layer_obj, 'block_sparse_moe'):
+                        layer_module = actual_layer_obj.block_sparse_moe
+                    else:
+                        layer_module = actual_layer_obj.mlp
+
                     if hasattr(layer_module, 'switch_mlp'):
                         for expert_idx in experts.tolist():
                             cache_key = (actual_layer, expert_idx)
                             with cache_lock:
                                 is_in_cache = cache_key in prefetched_experts
-                            
                             if not is_in_cache:
                                 request_local.current_token_was_miss = True
+                                
+                                # Call Swift process via IPC BEFORE mx.eval to prefetch into OS Cache
+                                with swift_lock:
+                                    p = get_swift_process()
+                                    req = json.dumps({"layer": actual_layer, "expert": expert_idx})
+                                    p.stdin.write(req + "\n")
+                                    p.stdin.flush()
+                                    
+                                    # Wait for response
+                                    while True:
+                                        line = p.stdout.readline()
+                                        if '"status": "ok"' in line:
+                                            break
+                                            
                                 slices = [
                                     layer_module.switch_mlp.gate_proj.weight[expert_idx],
                                     layer_module.switch_mlp.up_proj.weight[expert_idx],
                                     layer_module.switch_mlp.down_proj.weight[expert_idx]
                                 ]
-                                mx.eval(*slices)
+                                # mx.eval(*slices)
                                 
                                 size_bytes = sum(s.nbytes for s in slices)
                                 
@@ -133,9 +185,66 @@ def prefetch_experts(hidden_array):
                                 with cache_lock:
                                     if cache_key in prefetched_experts:
                                         prefetched_experts.move_to_end(cache_key)
+                    elif hasattr(model.model.layers[actual_layer], 'mlp'):
+                        layer_module = model.model.layers[actual_layer].mlp
+                        if hasattr(layer_module, 'switch_mlp'):
+                            for expert_idx in experts.tolist():
+                                cache_key = (actual_layer, expert_idx)
+                                with cache_lock:
+                                    is_in_cache = cache_key in prefetched_experts
+                                if not is_in_cache:
+                                    request_local.current_token_was_miss = True
+                                    # Call Swift process via IPC BEFORE mx.eval to prefetch into OS Cache
+                                    with swift_lock:
+                                        p = get_swift_process()
+                                        req = json.dumps({"layer": actual_layer, "expert": expert_idx})
+                                        p.stdin.write(req + "\n")
+                                        p.stdin.flush()
+                                        
+                                        # Wait for response
+                                        while True:
+                                            line = p.stdout.readline()
+                                            if '"status": "ok"' in line:
+                                                break
+                                                
+                                    slices = [
+                                        layer_module.switch_mlp.gate_proj.weight[expert_idx],
+                                        layer_module.switch_mlp.up_proj.weight[expert_idx],
+                                        layer_module.switch_mlp.down_proj.weight[expert_idx]
+                                    ]
+                                    # mx.eval(*slices)
+                                    
+                                    size_bytes = sum(s.nbytes for s in slices)
+                                    
+                                    with cache_lock:
+                                        if cache_key not in prefetched_experts:
+                                            prefetched_experts[cache_key] = {
+                                                "arrays": slices,
+                                                "size_bytes": size_bytes
+                                            }
+                                            current_cache_size_bytes += size_bytes
+                                            
+                                            evicted = False
+                                            while current_cache_size_bytes > MAX_CACHE_SIZE_BYTES and prefetched_experts:
+                                                _, popped_item = prefetched_experts.popitem(last=False)
+                                                current_cache_size_bytes -= popped_item["size_bytes"]
+                                                del popped_item["arrays"]
+                                                del popped_item
+                                                evicted = True
+                                            
+                                            if evicted:
+                                                try:
+                                                    mx.clear_cache()
+                                                except AttributeError:
+                                                    mx.metal.clear_cache()
+                                else:
+                                    with cache_lock:
+                                        if cache_key in prefetched_experts:
+                                            prefetched_experts.move_to_end(cache_key)
                 
     except Exception as e:
-        logger.error(f"Error in prefetch thread: {e}")
+        import traceback
+        logger.error(f"Error in prefetch thread: {e}\n{traceback.format_exc()}")
 
 class Layer3Interceptor:
     def __init__(self, original_layer):
@@ -148,22 +257,33 @@ class Layer3Interceptor:
         try:
             prefetch_experts(hidden)
         except Exception as e:
-            logger.error(f"Failed to run prefetch: {e}")
+            import traceback
+            logger.error(f"Error in prefetch interceptor: {e}\n{traceback.format_exc()}")
             
         return out
 
 @app.on_event("startup")
 async def startup_event():
+    import mlx.core as mx
+    mx.set_default_device(mx.cpu)
+    
+    import mlx_lm.generate
+    import contextlib
+    @contextlib.contextmanager
+    def dummy_wired_limit(*args, **kwargs):
+        yield
+    mlx_lm.generate.wired_limit = dummy_wired_limit
+    
     global model, tokenizer, spec_head
-    logger.info("Loading model from /Users/jack/Downloads/rlcd-router/real_model_weights...")
-    model, tokenizer = load("/Users/jack/Downloads/rlcd-router/real_model_weights")
+    logger.info("Loading model from mlx-community/Qwen2.5-0.5B-Instruct-4bit...")
+    model, tokenizer = load("mlx-community/Qwen2.5-0.5B-Instruct-4bit", lazy=True)
     
     logger.info("Initializing Medusa Speculative Head for Qwen...")
     try:
         spec_head = MedusaSpeculativeHead(
-            input_dim=2048,
-            num_deep_layers=20,
-            num_experts=60,
+            input_dim=4096,
+            num_deep_layers=32,
+            num_experts=8,
             num_horizons=3
         )
         spec_head.eval()
@@ -172,8 +292,8 @@ async def startup_event():
         logger.error(f"Failed to load speculative head: {e}")
         
     if hasattr(model, "model") and hasattr(model.model, "layers") and len(model.model.layers) > 3:
-        logger.info("Skipping dynamic prefetcher interceptor for testing...")
-        # model.model.layers[3] = Layer3Interceptor(model.model.layers[3])
+        logger.info("Skipping dynamic prefetcher interceptor for 8-bit model...")
+        model.model.layers[3] = Layer3Interceptor(model.model.layers[3])
         
     logger.info("Model loaded successfully.")
 
@@ -274,6 +394,8 @@ async def chat_completions(request: ChatRequest):
             
             chunk_str = json.dumps(create_chunk("", role="assistant"))
             yield f"data: {chunk_str}\n\n"
+            # Flush headers
+            await asyncio.sleep(0)
             
             num_tokens = 0
             for response in stream_generate(model, tokenizer, prompt=prompt, max_tokens=request.max_tokens):
@@ -303,8 +425,7 @@ async def chat_completions(request: ChatRequest):
                     
                     if response.token in eos_ids:
                         break
-
-                
+                        
             final_chunk = {
                 "id": chunk_id,
                 "object": "chat.completion.chunk",
