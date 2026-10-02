@@ -97,7 +97,6 @@ def prefetch_experts(hidden_array):
         
     try:
         hidden_array = hidden_array.astype(mx.float32)
-        mx.eval(hidden_array)
         
         try:
             hidden_np = np.array(hidden_array)
@@ -265,7 +264,7 @@ class Layer3Interceptor:
 @app.on_event("startup")
 async def startup_event():
     import mlx.core as mx
-    mx.set_default_device(mx.cpu)
+    # Removed mx.set_default_device(mx.cpu) to allow Metal
     
     import mlx_lm.generate
     import contextlib

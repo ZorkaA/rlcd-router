@@ -66,19 +66,28 @@ struct BenchmarkE2E {
                     
                     let sourceOffset = 0 // Dummy fetch to force bounded I/O paging
                     
-                    let (syncEvent, ticket) = fastIO.loadFallback(
-                        handle: weightHandle.ioFileHandle,
-                        offset: sourceOffset,
-                        size: config.expertSizeBytes,
-                        targetBuffer: slot.buffer,
-                        targetOffset: 0
-                    )
+                    let maxChunkSize = 32 * 1024 * 1024
+                    var currentOffset = 0
+                    var remainingSize = config.expertSizeBytes
                     
-                    await withCheckedContinuation { continuation in
-                        let listener = MTLSharedEventListener()
-                        syncEvent.notify(listener, atValue: ticket) { _, _ in
-                            continuation.resume()
+                    while remainingSize > 0 {
+                        let chunkSize = min(remainingSize, maxChunkSize)
+                        let (syncEvent, ticket) = fastIO.loadFallback(
+                            handle: weightHandle.ioFileHandle,
+                            offset: sourceOffset + currentOffset,
+                            size: chunkSize,
+                            targetBuffer: slot.buffer,
+                            targetOffset: currentOffset
+                        )
+                        
+                        await withCheckedContinuation { continuation in
+                            let listener = MTLSharedEventListener()
+                            syncEvent.notify(listener, atValue: ticket) { _, _ in
+                                continuation.resume()
+                            }
                         }
+                        currentOffset += chunkSize
+                        remainingSize -= chunkSize
                     }
                     try? pipeline.fallbackPool.reclaim(slot)
                 }
